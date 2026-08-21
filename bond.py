@@ -1,22 +1,30 @@
-class Bond:
-    def __init__(self, nominal, coupon_rate, maturity, frequency=1):
-        self.nominal=nominal
-        self.coupon_rate=coupon_rate
-        self.maturity=maturity
-        self.frequency=frequency
+import numpy as np
 
-    def cashflows(self):
-        flows=[]
-        n=int(self.maturity*self.frequency)
-        coupon=self.nominal*self.coupon_rate/self.frequency
-        for i in range(1,n+1):
-            t=i/self.frequency
-            amount=coupon
-            if i==n:
-                amount+=self.nominal
-            flows.append((t,amount))
-        return flows
+def prix_obligation(
+        nominal,
+        coupon,
+        maturite,
+        frequence,
+        taux_zero):
 
-    def price(self, curve):
-        return sum(cf*curve.discount_factor(t) for t,cf in self.cashflows())
+    n = int(maturite * frequence)
 
+    coupon_periodique = nominal * coupon / frequence
+
+    prix = 0
+
+    for i in range(1, n + 1):
+
+        temps = i / frequence
+
+        taux = taux_zero(temps)
+
+        prix += coupon_periodique / (
+            (1 + taux) ** temps
+        )
+
+    prix += nominal / (
+        (1 + taux_zero(maturite)) ** maturite
+    )
+
+    return prix
