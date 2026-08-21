@@ -52,6 +52,48 @@ def modified_duration(
     )
 
 
+def convexity(
+    bond,
+    curve
+):
+
+    price = bond.price(curve)
+
+    total = 0
+
+    n = int(
+        bond.maturity
+        * bond.frequency
+    )
+
+    coupon = (
+        bond.nominal
+        * bond.coupon_rate
+        / bond.frequency
+    )
+
+    for i in range(1, n + 1):
+
+        t = i / bond.frequency
+
+        rate = curve.get_rate(t)
+
+        cashflow = coupon
+
+        if i == n:
+            cashflow += bond.nominal
+
+        total += (
+            cashflow
+            * t
+            * (t + 1)
+            /
+            ((1 + rate) ** (t + 2))
+        )
+
+    return total / price
+
+
 def dv01(
     bond,
     curve
