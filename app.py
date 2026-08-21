@@ -1,90 +1,341 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import os
-import sys # Added for diagnostic code
 
-# Assuming bond.py, courbe_zero.py, and risque.py are now discoverable via sys.path
 from bond import Bond
 from courbe_zero import ZeroCurve
-from risque import macaulay_duration #, modified_duration, convexity, dv01
+from risque import (
+    macaulay_duration,
+    modified_duration,
+    convexity,
+    dv01
+)
 
-# Set page configuration
-st.set_page_config(page_title="Pricer Obligataire Maroc", layout="wide")
-st.title("Pricer Obligataire Maroc")
+# --------------------------------------------------
+# Configuration de la page
+# --------------------------------------------------
 
-# Define the path to the CSV file
-# Assuming courbe_taux.csv is in the same directory as app.py in the deployed environment
-CSV_FILE_PATH = "courbe_taux.csv"
+st.set_page_config(
+    page_title="Pricer Obligataire Maroc",
+    page_icon="📈",
+    layout="wide"
+)
 
-# --- Caching Data and Objects ---
-# Cache the CSV data loading for performance
+st.title("📈 Pricer Obligataire Maroc")
+st.markdown(
+    "Valorisation, mesure du risque et analyse de sensibilité des obligations."
+)
+
+# --------------------------------------------------
+# Chargement de la courbe de taux
+# --------------------------------------------------
+
+CSV_FILE = "courbe_taux.csv"
+
+
 @st.cache_data
-def load_curve_data(path):
+def load_curve_data():
+
     try:
-        return pd.read_csv(path)
+
+        df = pd.read_csv(CSV_FILE)
+
+        required_cols = ["tenor", "rate"]
+
+        for col in required_cols:
+
+            if col not in df.columns:
+                st.error(
+                    f"Colonne manquante : {col}"
+                )
+                return pd.DataFrame()
+
+        return df
+
     except FileNotFoundError:
-        st.error(f"Erreur : '{os.path.basename(path)}' introuvable. Veuillez vous assurer qu'il se trouve dans le bon répertoire.")
+
+        st.error(
+            f"Le fichier '{CSV_FILE}' est introuvable."
+        )
+
         return pd.DataFrame()
 
-# Cache the ZeroCurve object creation
-@st.cache_resource
-def create_zero_curve(tenors, rates):
-    return ZeroCurve(tenors, rates)
+    except Exception as e:
 
-# Load curve data
-curve_df = load_curve_data(CSV_FILE_PATH)
+        st.error(
+            f"Erreur de lecture : {e}"
+        )
 
-if not curve_df.empty:
-    # Create ZeroCurve object
-    curve = create_zero_curve(curve_df["tenor"], curve_df["rate"])
+        return pd.DataFrame()
 
-    # --- Streamlit Inputs ---
-    st.sidebar.header("Paramètres de l'Obligation")
-    nominal = st.sidebar.number_input("Nominal (MAD)", value=1000000, min_value=1000, step=10000)
-    coupon_rate = st.sidebar.number_input("Taux de Coupon (%)", value=3.5, min_value=0.0, max_value=100.0, step=0.1) / 100
-    maturity = st.sidebar.number_input("Maturité (années)", value=10, min_value=1, max_value=50, step=1)
-    frequency = st.sidebar.selectbox("Fréquence des paiements annuels", [1, 2], index=1) # 1 for annual, 2 for semi-annual
 
-    # Create Bond object
-    bond = Bond(nominal, coupon_rate, maturity, frequency)
+curve_df = load_curve_data()
 
-    # --- Calculations ---
-    price = bond.price(curve)
-    duration = macaulay_duration(bond, curve)
-    # You can add more metrics here as needed, e.g., modified_duration, convexity, dv01
+if curve_df.empty:
 
-    # --- Display Results ---
-    st.subheader("Résultats du Pricing")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.metric("Prix de l'Obligation", f"{price:,.2f} MAD")
-    with col2:
-        st.metric("Duration de Macaulay", f"{duration:.4f} ans")
+    st.stop()
 
-    # --- Plotting Zero Curve ---
-    st.subheader("Courbe de Taux Zéro")
-    fig = px.line(curve_df, x="tenor", y="rate", markers=True, title="Courbe de Taux Zéro (Taux Annuel)")
-    fig.update_layout(xaxis_title="Ténor (années)", yaxis_title="Taux Zéro (%)")
-    st.plotly_chart(fig, use_container_width=True)
+# --------------------------------------------------
+# Construction de la courbe zéro
+# --------------------------------------------------
 
-    st.markdown("--- ")
-    st.info("Note: Les taux sont affichés en pourcentage mais sont utilisés sous forme décimale dans les calculs.")
+curve = ZeroCurve(
+    curve_df["tenor"],
+    curve_df["rate"]
+)
 
-    # --- Diagnostic Code (Temporarily add to your app.py) ---
-    st.subheader("Diagnostic de l'environnement de déploiement")
-    st.write(f"Répertoire de travail actuel: {os.getcwd()}")
-    st.write(f"Chemins Python (sys.path): {sys.path}")
-    st.write("Contenu du répertoire courant:")
-    for item in os.listdir('.'):
-        st.write(f"- {item}")
-    # --- Fin du code de diagnostic ---
+# --------------------------------------------------
+# Paramètres utilisateur
+# --------------------------------------------------
 
-else:
-    st.warning("Impossible de charger les données de la courbe de taux. Veuillez vérifier le fichier 'courbe_taux.csv'.")
+st.sidebar.header("Paramètres de l'obligation")
 
-# Display the original content of the files for reference (optional, good for debugging/development)
-# st.subheader("Contenu des fichiers (pour le débogage)")
-# st.code(open('bond.py').read(), language='python')
-# st.code(open('courbe_zero.py').read(), language='python')
-# st.code(open('risque.py').read(), language='python')
+nominal = st.sidebar.number_input(
+    "Nominal (MAD)",
+    value=1000000,
+    min_value=1000,
+    step=10000
+)
+
+coupon_rate = st.sidebar.number_input(
+    "Coupon annuel (%)",
+    value=3.50,
+    step=0.10
+) / 100
+
+maturity = st.sidebar.number_input(
+    "Maturité (années)",
+    min_value=1,
+    max_value=50,
+    value=10
+)
+
+frequency = st.sidebar.selectbox(
+    "Fréquence des coupons",
+    [1, 2],
+    index=1
+)
+
+market_price = st.sidebar.number_input(
+    "Prix de marché (optionnel)",
+    value=1000000.0,
+    step=100.0
+)
+
+# --------------------------------------------------
+# Création de l'obligation
+# --------------------------------------------------
+
+bond = Bond(
+    nominal,
+    coupon_rate,
+    maturity,
+    frequency
+)
+
+# --------------------------------------------------
+# Calculs
+# --------------------------------------------------
+
+price = bond.price(curve)
+
+duration = macaulay_duration(
+    bond,
+    curve
+)
+
+mod_duration = modified_duration(
+    bond,
+    curve
+)
+
+conv = convexity(
+    bond,
+    curve
+)
+
+dv01_value = dv01(
+    bond,
+    curve
+)
+
+try:
+
+    ytm = bond.ytm(market_price)
+
+except:
+
+    ytm = None
+
+# --------------------------------------------------
+# Tableau de bord
+# --------------------------------------------------
+
+st.subheader("📊 Tableau de bord")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+
+    st.metric(
+        "Prix théorique",
+        f"{price:,.2f} MAD"
+    )
+
+with col2:
+
+    if ytm is not None:
+
+        st.metric(
+            "YTM",
+            f"{ytm*100:.2f}%"
+        )
+
+with col3:
+
+    st.metric(
+        "Écart Prix / Marché",
+        f"{price - market_price:,.2f}"
+    )
+
+col4, col5, col6 = st.columns(3)
+
+with col4:
+
+    st.metric(
+        "Duration Macaulay",
+        f"{duration:.2f}"
+    )
+
+with col5:
+
+    st.metric(
+        "Duration Modifiée",
+        f"{mod_duration:.2f}"
+    )
+
+with col6:
+
+    st.metric(
+        "DV01",
+        f"{dv01_value:,.2f}"
+    )
+
+st.metric(
+    "Convexité",
+    f"{conv:.2f}"
+)
+
+# --------------------------------------------------
+# Courbe des taux
+# --------------------------------------------------
+
+st.subheader("📉 Courbe Zéro Coupon")
+
+fig_curve = px.line(
+    curve_df,
+    x="tenor",
+    y="rate",
+    markers=True,
+    title="Courbe des taux zéro"
+)
+
+fig_curve.update_layout(
+    xaxis_title="Maturité (années)",
+    yaxis_title="Taux"
+)
+
+st.plotly_chart(
+    fig_curve,
+    use_container_width=True
+)
+
+# --------------------------------------------------
+# Analyse de sensibilité
+# --------------------------------------------------
+
+st.subheader("📈 Sensibilité aux variations de taux")
+
+shocks = [
+    -0.01,
+    -0.005,
+    0,
+    0.005,
+    0.01
+]
+
+results = []
+
+for shock in shocks:
+
+    shifted_curve = ZeroCurve(
+        curve_df["tenor"],
+        curve_df["rate"] + shock
+    )
+
+    shocked_price = bond.price(
+        shifted_curve
+    )
+
+    results.append(
+        {
+            "Choc (pb)": shock * 10000,
+            "Prix": shocked_price
+        }
+    )
+
+sens_df = pd.DataFrame(results)
+
+st.dataframe(
+    sens_df,
+    use_container_width=True
+)
+
+fig_sens = px.line(
+    sens_df,
+    x="Choc (pb)",
+    y="Prix",
+    markers=True,
+    title="Impact d'un choc de taux sur le prix"
+)
+
+st.plotly_chart(
+    fig_sens,
+    use_container_width=True
+)
+
+# --------------------------------------------------
+# Données de la courbe
+# --------------------------------------------------
+
+with st.expander("Afficher les données de la courbe"):
+
+    st.dataframe(
+        curve_df,
+        use_container_width=True
+    )
+
+# --------------------------------------------------
+# Export CSV
+# --------------------------------------------------
+
+csv_export = sens_df.to_csv(
+    index=False
+)
+
+st.download_button(
+    label="📥 Télécharger l'analyse de sensibilité",
+    data=csv_export,
+    file_name="sensibilite_obligataire.csv",
+    mime="text/csv"
+)
+
+# --------------------------------------------------
+# Pied de page
+# --------------------------------------------------
+
+st.markdown("---")
+
+st.caption(
+    "Pricer Obligataire Maroc - Version Professionnelle"
+)
