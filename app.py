@@ -11,9 +11,9 @@ from risque import (
     dv01
 )
 
-# =====================================================
+# ==================================================
 # CONFIGURATION
-# =====================================================
+# ==================================================
 
 st.set_page_config(
     page_title="Pricer Obligataire Maroc",
@@ -24,24 +24,29 @@ st.set_page_config(
 st.title("📈 Pricer Obligataire Maroc")
 
 st.markdown(
-    """
-    Application de valorisation obligataire :
-    - Prix théorique
-    - Yield To Maturity (YTM)
-    - Duration de Macaulay
-    - Duration modifiée
-    - Convexité
-    - DV01
-    - Analyse de sensibilité
-    """
+    "Valorisation, mesure du risque et analyse de sensibilité des obligations."
 )
 
-# =====================================================
-# CHARGEMENT COURBE
-# =====================================================
+# ==================================================
+# CHARGEMENT DE LA COURBE
+# ==================================================
+
+st.sidebar.header("Courbe des taux")
+
+uploaded_file = st.sidebar.file_uploader(
+    "Charger une nouvelle courbe",
+    type=["csv"]
+)
+
+if st.sidebar.button("🔄 Actualiser"):
+
+    st.cache_data.clear()
+
+    st.rerun()
+
 
 @st.cache_data
-def load_curve():
+def load_default_curve():
 
     df = pd.read_csv("courbe_taux.csv")
 
@@ -53,28 +58,41 @@ def load_curve():
 
 try:
 
-    curve_df = load_curve()
+    if uploaded_file is not None:
+
+        curve_df = pd.read_csv(uploaded_file)
+
+        curve_df["tenor"] = curve_df["tenor"].astype(float)
+        curve_df["rate"] = curve_df["rate"].astype(float)
+
+        st.sidebar.success(
+            "Nouvelle courbe chargée"
+        )
+
+    else:
+
+        curve_df = load_default_curve()
 
 except Exception as e:
 
     st.error(
-        f"Erreur lors du chargement de courbe_taux.csv : {e}"
+        f"Erreur de chargement de la courbe : {e}"
     )
 
     st.stop()
 
-# =====================================================
-# CONSTRUCTION COURBE ZERO
-# =====================================================
+# ==================================================
+# COURBE ZERO
+# ==================================================
 
 curve = ZeroCurve(
     curve_df["tenor"],
     curve_df["rate"]
 )
 
-# =====================================================
-# PARAMETRES
-# =====================================================
+# ==================================================
+# PARAMETRES OBLIGATAIRES
+# ==================================================
 
 st.sidebar.header("Paramètres obligataires")
 
@@ -110,9 +128,9 @@ market_price = st.sidebar.number_input(
     step=1000.0
 )
 
-# =====================================================
+# ==================================================
 # OBLIGATION
-# =====================================================
+# ==================================================
 
 bond = Bond(
     nominal,
@@ -121,9 +139,9 @@ bond = Bond(
     frequency
 )
 
-# =====================================================
+# ==================================================
 # CALCULS
-# =====================================================
+# ==================================================
 
 price = bond.price(curve)
 
@@ -153,13 +171,13 @@ try:
         market_price
     )
 
-except:
+except Exception:
 
     ytm = None
 
-# =====================================================
+# ==================================================
 # TABLEAU DE BORD
-# =====================================================
+# ==================================================
 
 st.subheader("Tableau de Bord")
 
@@ -182,7 +200,7 @@ with col2:
 with col3:
 
     st.metric(
-        "Ecart",
+        "Écart",
         f"{price-market_price:,.2f}"
     )
 
@@ -201,7 +219,7 @@ with col5:
 
     st.metric(
         "Duration",
-        f"{duration:.2f}"
+            f"{duration:.2f}"
     )
 
 with col6:
@@ -224,25 +242,31 @@ with col8:
 
     st.metric(
         "DV01",
-        f"{dv01_value:,.2f}"
+        f"{dv01_value:.2f}"
     )
 
-# =====================================================
-# COURBE DES TAUX
-# =====================================================
+# ==================================================
+# COURBE DE TAUX
+# ==================================================
 
 st.subheader("Courbe Zéro Coupon")
 
+curve_plot = curve_df.copy()
+
+curve_plot["rate_pct"] = (
+    curve_plot["rate"] * 100
+)
+
 fig_curve = px.line(
-    curve_df,
+    curve_plot,
     x="tenor",
-    y="rate",
+    y="rate_pct",
     markers=True
 )
 
 fig_curve.update_layout(
     xaxis_title="Maturité (années)",
-    yaxis_title="Taux"
+    yaxis_title="Taux (%)"
 )
 
 st.plotly_chart(
@@ -250,18 +274,22 @@ st.plotly_chart(
     use_container_width=True
 )
 
-# =====================================================
-# ANALYSE DE SENSIBILITE
-# =====================================================
+# ==================================================
+# SENSIBILITE
+# ==================================================
 
-st.subheader("Analyse de Sensibilité")
+st.subheader(
+    "Analyse de Sensibilité"
+)
 
 shocks = [
+    -200,
     -100,
     -50,
     0,
     50,
-    100
+    100,
+    200
 ]
 
 results = []
@@ -269,8 +297,11 @@ results = []
 for shock in shocks:
 
     shifted_curve = ZeroCurve(
+
         curve_df["tenor"],
-        curve_df["rate"] + shock/10000
+
+        curve_df["rate"]
+        + shock / 10000
     )
 
     shocked_price = bond.price(
@@ -308,37 +339,51 @@ st.plotly_chart(
     use_container_width=True
 )
 
-# =====================================================
-# DONNEES COURBE
-# =====================================================
+# ==================================================
+# DONNEES DE COURBE
+# ==================================================
 
 with st.expander(
     "Afficher la courbe de taux"
 ):
 
+    display_df = curve_df.copy()
+
+    display_df["rate"] = (
+        display_df["rate"] * 100
+    )
+
+    display_df.rename(
+        columns={
+            "rate": "Taux (%)",
+            "tenor": "Maturité"
+        },
+        inplace=True
+    )
+
     st.dataframe(
-        curve_df,
+        display_df,
         use_container_width=True
     )
 
-# =====================================================
-# EXPORT CSV
-# =====================================================
+# ==================================================
+# EXPORT
+# ==================================================
 
 csv_export = sens_df.to_csv(
     index=False
 )
 
 st.download_button(
-    label="Télécharger l'analyse",
+    label="📥 Télécharger l'analyse",
     data=csv_export,
     file_name="analyse_sensibilite.csv",
     mime="text/csv"
 )
 
-# =====================================================
+# ==================================================
 # FOOTER
-# =====================================================
+# ==================================================
 
 st.markdown("---")
 
