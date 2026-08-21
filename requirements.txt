@@ -1,5 +1,6 @@
-Streamlit
+streamlit
 pandas
-plotly
 numpy
+plotly
 scipy
+openpyxl
