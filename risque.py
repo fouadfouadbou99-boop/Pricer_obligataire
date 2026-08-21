@@ -1,43 +1,71 @@
-import numpy as np
+def macaulay_duration(bond, curve):
+
+    price = bond.price(curve)
+
+    weighted_pv = 0
+
+    n = int(
+        bond.maturity
+        * bond.frequency
+    )
+
+    coupon = (
+        bond.nominal
+        * bond.coupon_rate
+        / bond.frequency
+    )
+
+    for i in range(1, n + 1):
+
+        t = i / bond.frequency
+
+        rate = curve.get_rate(t)
+
+        cashflow = coupon
+
+        if i == n:
+            cashflow += bond.nominal
+
+        pv = cashflow / ((1 + rate) ** t)
+
+        weighted_pv += t * pv
+
+    return weighted_pv / price
 
 
-def macaulay_duration(dates, flux, taux):
+def modified_duration(
+    bond,
+    curve
+):
 
-    prix = 0
-    somme_ponderee = 0
+    md = macaulay_duration(
+        bond,
+        curve
+    )
 
-    for t, cf in zip(dates, flux):
+    y = curve.get_rate(
+        bond.maturity
+    )
 
-        va = cf / ((1 + taux) ** t)
-
-        prix += va
-
-        somme_ponderee += t * va
-
-    return somme_ponderee / prix
-
-
-def modified_duration(duration_macaulay, taux):
-
-    return duration_macaulay / (1 + taux)
+    return md / (
+        1 + y / bond.frequency
+    )
 
 
-def dv01(prix, duration_modifiee):
+def dv01(
+    bond,
+    curve
+):
 
-    return prix * duration_modifiee * 0.0001
+    price = bond.price(curve)
 
+    mod_dur = modified_duration(
+        bond,
+        curve
+    )
 
-def convexity(dates, flux, taux):
-
-    prix = 0
-    conv = 0
-
-    for t, cf in zip(dates, flux):
-
-        va = cf / ((1 + taux) ** t)
-
-        prix += va
-
-        conv += t * (t + 1) * va
-
-    return conv / (prix * (1 + taux) ** 2)
+    return (
+        price
+        * mod_dur
+        * 0.0001
+    )
