@@ -83,11 +83,8 @@ if not curve_df.empty:
 else:
     st.warning("Impossible de charger les données de la courbe de taux. Veuillez vérifier le fichier 'courbe_taux.csv'.")
 
-# Optionally, display the content of the other files for verification (can be commented out for production)
+# Display the original content of the files for reference (optional, good for debugging/development)
 # st.subheader("Contenu des fichiers (pour le débogage)")
-# with open('/content/extracted_scripts/bond.py', 'r') as f:
-#     st.code(f.read(), language='python')
-# with open('/content/extracted_scripts/courbe_zero.py', 'r') as f:
-#     st.code(f.read(), language='python')
-# with open('/content/extracted_scripts/risque.py', 'r') as f:
-#     st.code(f.read(), language='python')
+# st.code(open('bond.py').read(), language='python')
+# st.code(open('courbe_zero.py').read(), language='python')
+# st.code(open('risque.py').read(), language='python')
