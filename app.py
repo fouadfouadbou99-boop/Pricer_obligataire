@@ -1,3 +1,14 @@
+mport os
+import sys
+import streamlit as st
+# --- Code de diagnostic --- 
+st.subheader("Diagnostic de l'environnement de déploiement")
+st.write(f"Répertoire de travail actuel: {os.getcwd()}")
+st.write(f"Chemins Python (sys.path): {sys.path}")
+st.write("Contenu du répertoire courant:")
+for item in os.listdir('.'):
+    st.write(f"- {item}")
+# --- Fin du code de diagnostic --- 
 import streamlit as st
 import pandas as pd
 import plotly.express as px
