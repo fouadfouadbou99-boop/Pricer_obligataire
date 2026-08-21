@@ -1,3 +1,6 @@
+from scipy.optimize import newton
+
+
 class Bond:
 
     def __init__(
@@ -7,14 +10,20 @@ class Bond:
         maturity,
         frequency=2
     ):
+
         self.nominal = nominal
         self.coupon_rate = coupon_rate
         self.maturity = maturity
         self.frequency = frequency
 
-    def price(self, curve):
+    def cashflows(self):
 
-        n = int(self.maturity * self.frequency)
+        flows = []
+
+        n = int(
+            self.maturity
+            * self.frequency
+        )
 
         coupon = (
             self.nominal
@@ -22,21 +31,60 @@ class Bond:
             / self.frequency
         )
 
-        price = 0
-
         for i in range(1, n + 1):
 
             t = i / self.frequency
 
+            cf = coupon
+
+            if i == n:
+                cf += self.nominal
+
+            flows.append(
+                (t, cf)
+            )
+
+        return flows
+
+    def price(
+        self,
+        curve
+    ):
+
+        value = 0
+
+        for t, cf in self.cashflows():
+
             rate = curve.get_rate(t)
 
-            price += coupon / ((1 + rate) ** t)
+            value += (
+                cf /
+                ((1 + rate) ** t)
+            )
 
-        price += (
-            self.nominal
-            /
-            ((1 + curve.get_rate(self.maturity))
-             ** self.maturity)
+        return value
+
+    def ytm(
+        self,
+        market_price
+    ):
+
+        def objective(y):
+
+            value = 0
+
+            for t, cf in self.cashflows():
+
+                value += (
+                    cf /
+                    ((1 + y) ** t)
+                )
+
+            return value - market_price
+
+        return float(
+            newton(
+                objective,
+                0.05
+            )
         )
-
-        return price
