@@ -1,27 +1,43 @@
 import numpy as np
 
-def duration_modifiee(duration_macaulay, ytm):
 
-    return duration_macaulay / (1 + ytm)
+def macaulay_duration(dates, flux, taux):
 
-
-def dv01(prix, duration_mod, delta=0.0001):
-
-    return prix * duration_mod * delta
-
-
-def convexite(dates, flux, taux):
-
-    numerateur = 0
-
-    denominateur = 0
+    prix = 0
+    somme_ponderee = 0
 
     for t, cf in zip(dates, flux):
 
-        facteur = (1 + taux) ** t
+        va = cf / ((1 + taux) ** t)
 
-        numerateur += cf * t * (t + 1) / facteur
+        prix += va
 
-        denominateur += cf / facteur
+        somme_ponderee += t * va
 
-    return numerateur / denominateur
+    return somme_ponderee / prix
+
+
+def modified_duration(duration_macaulay, taux):
+
+    return duration_macaulay / (1 + taux)
+
+
+def dv01(prix, duration_modifiee):
+
+    return prix * duration_modifiee * 0.0001
+
+
+def convexity(dates, flux, taux):
+
+    prix = 0
+    conv = 0
+
+    for t, cf in zip(dates, flux):
+
+        va = cf / ((1 + taux) ** t)
+
+        prix += va
+
+        conv += t * (t + 1) * va
+
+    return conv / (prix * (1 + taux) ** 2)
