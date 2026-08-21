@@ -1,4 +1,4 @@
-cclass bond:
+class Bond:
     def __init__(self, nominal, coupon_rate, maturity, frequency=1):
         self.nominal=nominal
         self.coupon_rate=coupon_rate
