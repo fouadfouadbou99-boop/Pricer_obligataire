@@ -19,4 +19,3 @@ st.metric("Prix",f"{price:,.2f} MAD")
 st.metric("Duration",f"{macaulay_duration(bond,curve):.4f}")
 fig=px.line(curve_df,x="tenor",y="rate",markers=True)
 st.plotly_chart(fig,use_container_width=True)
-
