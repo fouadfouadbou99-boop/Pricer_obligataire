@@ -11,9 +11,9 @@ from risque import (
     dv01
 )
 
-# --------------------------------------------------
-# Configuration de la page
-# --------------------------------------------------
+# =====================================================
+# CONFIGURATION
+# =====================================================
 
 st.set_page_config(
     page_title="Pricer Obligataire Maroc",
@@ -22,78 +22,66 @@ st.set_page_config(
 )
 
 st.title("📈 Pricer Obligataire Maroc")
+
 st.markdown(
-    "Valorisation, mesure du risque et analyse de sensibilité des obligations."
+    """
+    Application de valorisation obligataire :
+    - Prix théorique
+    - Yield To Maturity (YTM)
+    - Duration de Macaulay
+    - Duration modifiée
+    - Convexité
+    - DV01
+    - Analyse de sensibilité
+    """
 )
 
-# --------------------------------------------------
-# Chargement de la courbe de taux
-# --------------------------------------------------
-
-CSV_FILE = "courbe_taux.csv"
-
+# =====================================================
+# CHARGEMENT COURBE
+# =====================================================
 
 @st.cache_data
-def load_curve_data():
+def load_curve():
 
-    try:
+    df = pd.read_csv("courbe_taux.csv")
 
-        df = pd.read_csv(CSV_FILE)
+    df["tenor"] = df["tenor"].astype(float)
+    df["rate"] = df["rate"].astype(float)
 
-        required_cols = ["tenor", "rate"]
-
-        for col in required_cols:
-
-            if col not in df.columns:
-                st.error(
-                    f"Colonne manquante : {col}"
-                )
-                return pd.DataFrame()
-
-        return df
-
-    except FileNotFoundError:
-
-        st.error(
-            f"Le fichier '{CSV_FILE}' est introuvable."
-        )
-
-        return pd.DataFrame()
-
-    except Exception as e:
-
-        st.error(
-            f"Erreur de lecture : {e}"
-        )
-
-        return pd.DataFrame()
+    return df
 
 
-curve_df = load_curve_data()
+try:
 
-if curve_df.empty:
+    curve_df = load_curve()
+
+except Exception as e:
+
+    st.error(
+        f"Erreur lors du chargement de courbe_taux.csv : {e}"
+    )
 
     st.stop()
 
-# --------------------------------------------------
-# Construction de la courbe zéro
-# --------------------------------------------------
+# =====================================================
+# CONSTRUCTION COURBE ZERO
+# =====================================================
 
 curve = ZeroCurve(
     curve_df["tenor"],
     curve_df["rate"]
 )
 
-# --------------------------------------------------
-# Paramètres utilisateur
-# --------------------------------------------------
+# =====================================================
+# PARAMETRES
+# =====================================================
 
-st.sidebar.header("Paramètres de l'obligation")
+st.sidebar.header("Paramètres obligataires")
 
 nominal = st.sidebar.number_input(
     "Nominal (MAD)",
-    value=1000000,
     min_value=1000,
+    value=1000000,
     step=10000
 )
 
@@ -111,20 +99,20 @@ maturity = st.sidebar.number_input(
 )
 
 frequency = st.sidebar.selectbox(
-    "Fréquence des coupons",
+    "Fréquence coupon",
     [1, 2],
     index=1
 )
 
 market_price = st.sidebar.number_input(
-    "Prix de marché (optionnel)",
-    value=1000000.0,
-    step=100.0
+    "Prix de marché",
+    value=float(nominal),
+    step=1000.0
 )
 
-# --------------------------------------------------
-# Création de l'obligation
-# --------------------------------------------------
+# =====================================================
+# OBLIGATION
+# =====================================================
 
 bond = Bond(
     nominal,
@@ -133,9 +121,9 @@ bond = Bond(
     frequency
 )
 
-# --------------------------------------------------
-# Calculs
-# --------------------------------------------------
+# =====================================================
+# CALCULS
+# =====================================================
 
 price = bond.price(curve)
 
@@ -161,28 +149,46 @@ dv01_value = dv01(
 
 try:
 
-    ytm = bond.ytm(market_price)
+    ytm = bond.ytm(
+        market_price
+    )
 
 except:
 
     ytm = None
 
-# --------------------------------------------------
-# Tableau de bord
-# --------------------------------------------------
+# =====================================================
+# TABLEAU DE BORD
+# =====================================================
 
-st.subheader("📊 Tableau de bord")
+st.subheader("Tableau de Bord")
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
 
     st.metric(
-        "Prix théorique",
+        "Prix Théorique",
         f"{price:,.2f} MAD"
     )
 
 with col2:
+
+    st.metric(
+        "Prix Marché",
+        f"{market_price:,.2f} MAD"
+    )
+
+with col3:
+
+    st.metric(
+        "Ecart",
+        f"{price-market_price:,.2f}"
+    )
+
+col4, col5, col6 = st.columns(3)
+
+with col4:
 
     if ytm is not None:
 
@@ -191,53 +197,47 @@ with col2:
             f"{ytm*100:.2f}%"
         )
 
-with col3:
+with col5:
 
     st.metric(
-        "Écart Prix / Marché",
-        f"{price - market_price:,.2f}"
-    )
-
-col4, col5, col6 = st.columns(3)
-
-with col4:
-
-    st.metric(
-        "Duration Macaulay",
+        "Duration",
         f"{duration:.2f}"
     )
 
-with col5:
+with col6:
 
     st.metric(
         "Duration Modifiée",
         f"{mod_duration:.2f}"
     )
 
-with col6:
+col7, col8 = st.columns(2)
+
+with col7:
+
+    st.metric(
+        "Convexité",
+        f"{conv:.2f}"
+    )
+
+with col8:
 
     st.metric(
         "DV01",
         f"{dv01_value:,.2f}"
     )
 
-st.metric(
-    "Convexité",
-    f"{conv:.2f}"
-)
+# =====================================================
+# COURBE DES TAUX
+# =====================================================
 
-# --------------------------------------------------
-# Courbe des taux
-# --------------------------------------------------
-
-st.subheader("📉 Courbe Zéro Coupon")
+st.subheader("Courbe Zéro Coupon")
 
 fig_curve = px.line(
     curve_df,
     x="tenor",
     y="rate",
-    markers=True,
-    title="Courbe des taux zéro"
+    markers=True
 )
 
 fig_curve.update_layout(
@@ -250,18 +250,18 @@ st.plotly_chart(
     use_container_width=True
 )
 
-# --------------------------------------------------
-# Analyse de sensibilité
-# --------------------------------------------------
+# =====================================================
+# ANALYSE DE SENSIBILITE
+# =====================================================
 
-st.subheader("📈 Sensibilité aux variations de taux")
+st.subheader("Analyse de Sensibilité")
 
 shocks = [
-    -0.01,
-    -0.005,
+    -100,
+    -50,
     0,
-    0.005,
-    0.01
+    50,
+    100
 ]
 
 results = []
@@ -270,7 +270,7 @@ for shock in shocks:
 
     shifted_curve = ZeroCurve(
         curve_df["tenor"],
-        curve_df["rate"] + shock
+        curve_df["rate"] + shock/10000
     )
 
     shocked_price = bond.price(
@@ -279,12 +279,17 @@ for shock in shocks:
 
     results.append(
         {
-            "Choc (pb)": shock * 10000,
-            "Prix": shocked_price
+            "Choc (pb)": shock,
+            "Prix": round(
+                shocked_price,
+                2
+            )
         }
     )
 
-sens_df = pd.DataFrame(results)
+sens_df = pd.DataFrame(
+    results
+)
 
 st.dataframe(
     sens_df,
@@ -295,8 +300,7 @@ fig_sens = px.line(
     sens_df,
     x="Choc (pb)",
     y="Prix",
-    markers=True,
-    title="Impact d'un choc de taux sur le prix"
+    markers=True
 )
 
 st.plotly_chart(
@@ -304,38 +308,40 @@ st.plotly_chart(
     use_container_width=True
 )
 
-# --------------------------------------------------
-# Données de la courbe
-# --------------------------------------------------
+# =====================================================
+# DONNEES COURBE
+# =====================================================
 
-with st.expander("Afficher les données de la courbe"):
+with st.expander(
+    "Afficher la courbe de taux"
+):
 
     st.dataframe(
         curve_df,
         use_container_width=True
     )
 
-# --------------------------------------------------
-# Export CSV
-# --------------------------------------------------
+# =====================================================
+# EXPORT CSV
+# =====================================================
 
 csv_export = sens_df.to_csv(
     index=False
 )
 
 st.download_button(
-    label="📥 Télécharger l'analyse de sensibilité",
+    label="Télécharger l'analyse",
     data=csv_export,
-    file_name="sensibilite_obligataire.csv",
+    file_name="analyse_sensibilite.csv",
     mime="text/csv"
 )
 
-# --------------------------------------------------
-# Pied de page
-# --------------------------------------------------
+# =====================================================
+# FOOTER
+# =====================================================
 
 st.markdown("---")
 
 st.caption(
-    "Pricer Obligataire Maroc - Version Professionnelle"
+    "Pricer Obligataire Maroc | Version Professionnelle"
 )
