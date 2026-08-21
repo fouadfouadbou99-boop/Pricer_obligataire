@@ -28,27 +28,16 @@ st.markdown(
 )
 
 # ==================================================
-# CHARGEMENT DE LA COURBE
+# CHARGEMENT COURBE EXCEL
 # ==================================================
 
-st.sidebar.header("Courbe des taux")
-
-uploaded_file = st.sidebar.file_uploader(
-    "Charger une nouvelle courbe",
-    type=["csv"]
-)
-
-if st.sidebar.button("🔄 Actualiser"):
-
-    st.cache_data.clear()
-
-    st.rerun()
-
-
 @st.cache_data
-def load_default_curve():
+def load_curve():
 
-    df = pd.read_csv("courbe_taux.csv")
+    df = pd.read_excel(
+        "courbe_taux.xlsx",
+        sheet_name="Courbe"
+    )
 
     df["tenor"] = df["tenor"].astype(float)
     df["rate"] = df["rate"].astype(float)
@@ -58,25 +47,12 @@ def load_default_curve():
 
 try:
 
-    if uploaded_file is not None:
-
-        curve_df = pd.read_csv(uploaded_file)
-
-        curve_df["tenor"] = curve_df["tenor"].astype(float)
-        curve_df["rate"] = curve_df["rate"].astype(float)
-
-        st.sidebar.success(
-            "Nouvelle courbe chargée"
-        )
-
-    else:
-
-        curve_df = load_default_curve()
+    curve_df = load_curve()
 
 except Exception as e:
 
     st.error(
-        f"Erreur de chargement de la courbe : {e}"
+        f"Erreur lors du chargement de courbe_taux.xlsx : {e}"
     )
 
     st.stop()
@@ -91,7 +67,7 @@ curve = ZeroCurve(
 )
 
 # ==================================================
-# PARAMETRES OBLIGATAIRES
+# PARAMETRES
 # ==================================================
 
 st.sidebar.header("Paramètres obligataires")
@@ -179,7 +155,7 @@ except Exception:
 # TABLEAU DE BORD
 # ==================================================
 
-st.subheader("Tableau de Bord")
+st.subheader("📊 Tableau de Bord")
 
 col1, col2, col3 = st.columns(3)
 
@@ -201,7 +177,7 @@ with col3:
 
     st.metric(
         "Écart",
-        f"{price-market_price:,.2f}"
+        f"{price - market_price:,.2f}"
     )
 
 col4, col5, col6 = st.columns(3)
@@ -212,14 +188,14 @@ with col4:
 
         st.metric(
             "YTM",
-            f"{ytm*100:.2f}%"
+            f"{ytm * 100:.2f}%"
         )
 
 with col5:
 
     st.metric(
         "Duration",
-            f"{duration:.2f}"
+        f"{duration:.2f}"
     )
 
 with col6:
@@ -246,21 +222,21 @@ with col8:
     )
 
 # ==================================================
-# COURBE DE TAUX
+# COURBE DES TAUX
 # ==================================================
 
-st.subheader("Courbe Zéro Coupon")
+st.subheader("📈 Courbe Zéro Coupon")
 
 curve_plot = curve_df.copy()
 
-curve_plot["rate_pct"] = (
+curve_plot["Taux (%)"] = (
     curve_plot["rate"] * 100
 )
 
 fig_curve = px.line(
     curve_plot,
     x="tenor",
-    y="rate_pct",
+    y="Taux (%)",
     markers=True
 )
 
@@ -275,12 +251,10 @@ st.plotly_chart(
 )
 
 # ==================================================
-# SENSIBILITE
+# ANALYSE DE SENSIBILITE
 # ==================================================
 
-st.subheader(
-    "Analyse de Sensibilité"
-)
+st.subheader("📉 Analyse de Sensibilité")
 
 shocks = [
     -200,
@@ -297,11 +271,8 @@ results = []
 for shock in shocks:
 
     shifted_curve = ZeroCurve(
-
         curve_df["tenor"],
-
-        curve_df["rate"]
-        + shock / 10000
+        curve_df["rate"] + shock / 10000
     )
 
     shocked_price = bond.price(
@@ -318,9 +289,7 @@ for shock in shocks:
         }
     )
 
-sens_df = pd.DataFrame(
-    results
-)
+sens_df = pd.DataFrame(results)
 
 st.dataframe(
     sens_df,
@@ -340,12 +309,10 @@ st.plotly_chart(
 )
 
 # ==================================================
-# DONNEES DE COURBE
+# DONNEES COURBE
 # ==================================================
 
-with st.expander(
-    "Afficher la courbe de taux"
-):
+with st.expander("Afficher la courbe de taux"):
 
     display_df = curve_df.copy()
 
@@ -355,8 +322,8 @@ with st.expander(
 
     display_df.rename(
         columns={
-            "rate": "Taux (%)",
-            "tenor": "Maturité"
+            "tenor": "Maturité",
+            "rate": "Taux (%)"
         },
         inplace=True
     )
@@ -367,16 +334,16 @@ with st.expander(
     )
 
 # ==================================================
-# EXPORT
+# EXPORT CSV
 # ==================================================
 
-csv_export = sens_df.to_csv(
+export_csv = sens_df.to_csv(
     index=False
 )
 
 st.download_button(
     label="📥 Télécharger l'analyse",
-    data=csv_export,
+    data=export_csv,
     file_name="analyse_sensibilite.csv",
     mime="text/csv"
 )
