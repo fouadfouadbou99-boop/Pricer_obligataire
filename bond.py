@@ -19,3 +19,4 @@ class Bond:
 
     def price(self, curve):
         return sum(cf*curve.discount_factor(t) for t,cf in self.cashflows())
+
