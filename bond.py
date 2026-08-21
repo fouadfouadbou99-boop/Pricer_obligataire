@@ -1,30 +1,50 @@
 import numpy as np
 
-def prix_obligation(
+class Bond:
+
+    def __init__(
+        self,
         nominal,
-        coupon,
-        maturite,
-        frequence,
-        taux_zero):
+        coupon_rate,
+        maturity,
+        frequency=2
+    ):
+        self.nominal = nominal
+        self.coupon_rate = coupon_rate
+        self.maturity = maturity
+        self.frequency = frequency
 
-    n = int(maturite * frequence)
+    def price(self, curve):
 
-    coupon_periodique = nominal * coupon / frequence
+        n = int(self.maturity * self.frequency)
 
-    prix = 0
-
-    for i in range(1, n + 1):
-
-        temps = i / frequence
-
-        taux = taux_zero(temps)
-
-        prix += coupon_periodique / (
-            (1 + taux) ** temps
+        coupon_periodique = (
+            self.nominal
+            * self.coupon_rate
+            / self.frequency
         )
 
-    prix += nominal / (
-        (1 + taux_zero(maturite)) ** maturite
-    )
+        prix = 0
 
-    return prix
+        for i in range(1, n + 1):
+
+            temps = i / self.frequency
+
+            taux = curve.get_rate(temps)
+
+            prix += (
+                coupon_periodique
+                /
+                ((1 + taux) ** temps)
+            )
+
+        prix += (
+            self.nominal
+            /
+            (
+                (1 + curve.get_rate(self.maturity))
+                ** self.maturity
+            )
+        )
+
+        return prix
