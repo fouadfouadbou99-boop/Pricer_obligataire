@@ -1,21 +1,93 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
+import os
+import sys # Added for diagnostic code
+
+# Assuming bond.py, courbe_zero.py, and risque.py are now discoverable via sys.path
 from bond import Bond
 from courbe_zero import ZeroCurve
-from risque import macaulay_duration, modified_duration, convexity, dv01
+from risque import macaulay_duration #, modified_duration, convexity, dv01
 
-st.set_page_config(page_title="Pricer Obligataire Maroc",layout="wide")
+# Set page configuration
+st.set_page_config(page_title="Pricer Obligataire Maroc", layout="wide")
 st.title("Pricer Obligataire Maroc")
-curve_df=pd.read_csv("courbe_taux.csv")
-curve=ZeroCurve(curve_df["tenor"],curve_df["rate"])
-nominal=st.number_input("Nominal",value=1000000)
-coupon=st.number_input("Coupon %",value=3.5)/100
-maturity=st.number_input("Maturite",value=10)
-frequency=st.selectbox("Frequence",[1,2])
-bond=Bond(nominal,coupon,maturity,frequency)
-price=bond.price(curve)
-st.metric("Prix",f"{price:,.2f} MAD")
-st.metric("Duration",f"{macaulay_duration(bond,curve):.4f}")
-fig=px.line(curve_df,x="tenor",y="rate",markers=True)
-st.plotly_chart(fig,use_container_width=True)
+
+# Define the path to the CSV file
+# Assuming courbe_taux.csv is in the same directory as app.py in the deployed environment
+CSV_FILE_PATH = "courbe_taux.csv"
+
+# --- Caching Data and Objects ---
+# Cache the CSV data loading for performance
+@st.cache_data
+def load_curve_data(path):
+    try:
+        return pd.read_csv(path)
+    except FileNotFoundError:
+        st.error(f"Erreur : '{os.path.basename(path)}' introuvable. Veuillez vous assurer qu'il se trouve dans le bon répertoire.")
+        return pd.DataFrame()
+
+# Cache the ZeroCurve object creation
+@st.cache_resource
+def create_zero_curve(tenors, rates):
+    return ZeroCurve(tenors, rates)
+
+# Load curve data
+curve_df = load_curve_data(CSV_FILE_PATH)
+
+if not curve_df.empty:
+    # Create ZeroCurve object
+    curve = create_zero_curve(curve_df["tenor"], curve_df["rate"])
+
+    # --- Streamlit Inputs ---
+    st.sidebar.header("Paramètres de l'Obligation")
+    nominal = st.sidebar.number_input("Nominal (MAD)", value=1000000, min_value=1000, step=10000)
+    coupon_rate = st.sidebar.number_input("Taux de Coupon (%)", value=3.5, min_value=0.0, max_value=100.0, step=0.1) / 100
+    maturity = st.sidebar.number_input("Maturité (années)", value=10, min_value=1, max_value=50, step=1)
+    frequency = st.sidebar.selectbox("Fréquence des paiements annuels", [1, 2], index=1) # 1 for annual, 2 for semi-annual
+
+    # Create Bond object
+    bond = Bond(nominal, coupon_rate, maturity, frequency)
+
+    # --- Calculations ---
+    price = bond.price(curve)
+    duration = macaulay_duration(bond, curve)
+    # You can add more metrics here as needed, e.g., modified_duration, convexity, dv01
+
+    # --- Display Results ---
+    st.subheader("Résultats du Pricing")
+    col1, col2 = st.columns(2)
+    with col1:
+        st.metric("Prix de l'Obligation", f"{price:,.2f} MAD")
+    with col2:
+        st.metric("Duration de Macaulay", f"{duration:.4f} ans")
+
+    # --- Plotting Zero Curve ---
+    st.subheader("Courbe de Taux Zéro")
+    fig = px.line(curve_df, x="tenor", y="rate", markers=True, title="Courbe de Taux Zéro (Taux Annuel)")
+    fig.update_layout(xaxis_title="Ténor (années)", yaxis_title="Taux Zéro (%)")
+    st.plotly_chart(fig, use_container_width=True)
+
+    st.markdown("--- ")
+    st.info("Note: Les taux sont affichés en pourcentage mais sont utilisés sous forme décimale dans les calculs.")
+
+    # --- Diagnostic Code (Temporarily add to your app.py) ---
+    st.subheader("Diagnostic de l'environnement de déploiement")
+    st.write(f"Répertoire de travail actuel: {os.getcwd()}")
+    st.write(f"Chemins Python (sys.path): {sys.path}")
+    st.write("Contenu du répertoire courant:")
+    for item in os.listdir('.'):
+        st.write(f"- {item}")
+    # --- Fin du code de diagnostic ---
+
+else:
+    st.warning("Impossible de charger les données de la courbe de taux. Veuillez vérifier le fichier 'courbe_taux.csv'.")
+
+# Optionally, display the content of the other files for verification (can be commented out for production)
+# st.subheader("Contenu des fichiers (pour le débogage)")
+# with open('/content/extracted_scripts/bond.py', 'r') as f:
+#     st.code(f.read(), language='python')
+# with open('/content/extracted_scripts/courbe_zero.py', 'r') as f:
+#     st.code(f.read(), language='python')
+# with open('/content/extracted_scripts/risque.py', 'r') as f:
+#     st.code(f.read(), language='python')
