@@ -1,19 +1,19 @@
+import pandas as pd
 import numpy as np
-
 
 class ZeroCurve:
 
-    def __init__(self, tenors, rates):
+    def __init__(self, fichier_csv):
 
-        self.tenors = np.array(tenors)
-        self.rates = np.array(rates)
+        df = pd.read_csv(fichier_csv)
+
+        self.tenors = df["tenor"].values
+        self.rates = df["rate"].values
 
     def get_rate(self, maturity):
 
-        return float(
-            np.interp(
-                maturity,
-                self.tenors,
-                self.rates
-            )
+        return np.interp(
+            maturity,
+            self.tenors,
+            self.rates
         )
