@@ -1,19 +1,27 @@
-from courbe_zero import ZeroCurve
+import numpy as np
 
-def macaulay_duration(bond,curve):
-    price=bond.price(curve)
-    return sum(t*cf*curve.discount_factor(t) for t,cf in bond.cashflows())/price
+def duration_modifiee(duration_macaulay, ytm):
 
-def modified_duration(bond,curve):
-    d=macaulay_duration(bond,curve)
-    y=curve.get_rate(bond.maturity)
-    return d/(1+y)
+    return duration_macaulay / (1 + ytm)
 
-def convexity(bond,curve):
-    price=bond.price(curve)
-    return sum(cf*curve.discount_factor(t)*t*(t+1) for t,cf in bond.cashflows())/price
 
-def dv01(bond,curve):
-    shifted=ZeroCurve(curve.tenors, curve.rates+0.0001)
-    return bond.price(shifted)-bond.price(curve)
+def dv01(prix, duration_mod, delta=0.0001):
 
+    return prix * duration_mod * delta
+
+
+def convexite(dates, flux, taux):
+
+    numerateur = 0
+
+    denominateur = 0
+
+    for t, cf in zip(dates, flux):
+
+        facteur = (1 + taux) ** t
+
+        numerateur += cf * t * (t + 1) / facteur
+
+        denominateur += cf / facteur
+
+    return numerateur / denominateur
