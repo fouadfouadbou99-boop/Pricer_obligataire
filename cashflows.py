@@ -1,18 +1,25 @@
 import numpy as np
 
-def generer_flux(nominal, coupon, maturite, frequence):
-    """
-    Génère les flux futurs de l'obligation.
-    """
 
-    n = int(maturite * frequence)
+def generate_cashflows(bond):
 
-    coupon_periodique = nominal * coupon / frequence
+    n = int(
+        bond.maturity * bond.frequency
+    )
 
-    dates = np.arange(1, n + 1) / frequence
+    coupon_cf = (
+        bond.nominal *
+        bond.coupon /
+        bond.frequency
+    )
 
-    flux = [coupon_periodique] * n
+    times = np.arange(
+        1,
+        n + 1
+    ) / bond.frequency
 
-    flux[-1] += nominal
+    cashflows = [coupon_cf] * n
 
-    return dates, flux
+    cashflows[-1] += bond.nominal
+
+    return times, cashflows
