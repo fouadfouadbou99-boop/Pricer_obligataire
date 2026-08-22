@@ -333,4 +333,3 @@ with open('app.py', 'w') as f:
     f.write(app_py_content)
 
 print("Fichier 'app.py' créé dans l'environnement Colab.")
-)
