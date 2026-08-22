@@ -328,7 +328,7 @@ st.markdown("---")
 st.caption(
     "Portefeuille Obligataire Maroc | Version Professionnelle"
 )
-"""
+""")
 
 with open('app.py', 'w') as f:
     f.write(app_py_content)
