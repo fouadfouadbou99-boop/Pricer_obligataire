@@ -120,7 +120,7 @@ type=["xlsx", "csv"]
 53
 try:
 54
- 
+
 55
 if fichier_courbe is not None:
 56
