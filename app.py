@@ -37,8 +37,6 @@ type=["xlsx"]
 )
 15
  try:
-17
- 
 18
 if fichier_portefeuille is not None:
 19
@@ -49,8 +47,6 @@ fichier_portefeuille,
 engine="openpyxl"
 23
 )
-24
- 
 25
 st.sidebar.success(
 26
