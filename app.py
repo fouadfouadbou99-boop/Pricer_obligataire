@@ -28,8 +28,7 @@ st.sidebar.header("📂 Chargement des données")
 9
 # ----------------------------------------
 10
- 
-11
+ 11
 fichier_portefeuille = st.sidebar.file_uploader(
 12
 "📁 Charger le portefeuille",
