@@ -131,7 +131,7 @@ with col4:
 
 st.subheader("Portefeuille")
 
-colonnes = [
+colonnes = [)
 
     "Code",
     "Description Titres",
