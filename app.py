@@ -7,13 +7,8 @@ from courbe_zero import ZeroCurve
 from risque import (
     macaulay_duration,
     modified_duration,
-    convexity,
     dv01
 )
-
-# ==================================================
-# CONFIGURATION
-# ==================================================
 
 st.set_page_config(
     page_title="Pricer Obligataire Maroc",
@@ -22,340 +17,195 @@ st.set_page_config(
 )
 
 st.title("📈 Pricer Obligataire Maroc")
-
 st.markdown(
     "Valorisation, mesure du risque et analyse de sensibilité des obligations."
 )
 
-# ==================================================
-# CHARGEMENT COURBE EXCEL
-# ==================================================
-
-@st.cache_data
-def load_curve():
-
-    df = pd.read_excel(
-        "courbe_taux.xlsx",
-        engine="openpyxl"
-    )
-
-    df.columns = [
-        str(col).strip()
-        for col in df.columns
-    ]
-
-    if "Taux" in df.columns:
-
-        df.rename(
-            columns={
-                "Taux": "rate"
-            },
-            inplace=True
-        )
-
-    df["tenor"] = df["tenor"].astype(float)
-    df["rate"] = df["rate"].astype(float)
-
-    return df
-
-
-try:
-
-    curve_df = load_curve()
-
-except Exception as e:
-
-    st.error(
-        f"Erreur lors du chargement de courbe_taux.xlsx : {e}"
-    )
-
-    st.stop()
-
-# ==================================================
-# CONSTRUCTION COURBE ZERO
-# ==================================================
-
-curve = ZeroCurve(
-    curve_df["tenor"],
-    curve_df["rate"]
-)
-
-# ==================================================
-# PARAMETRES OBLIGATION
-# ==================================================
+# ==========================
+# Paramètres
+# ==========================
 
 st.sidebar.header("Paramètres obligataires")
 
 nominal = st.sidebar.number_input(
     "Nominal (MAD)",
-    min_value=1000,
-    value=1000000,
-    step=10000
+    value=1_000_000
 )
 
-coupon_rate = st.sidebar.number_input(
+coupon_pct = st.sidebar.number_input(
     "Coupon annuel (%)",
-    value=3.50,
-    step=0.10
-) / 100
+    value=3.50
+)
 
 maturity = st.sidebar.number_input(
     "Maturité (années)",
-    min_value=1,
-    max_value=50,
     value=10
 )
 
 frequency = st.sidebar.selectbox(
     "Fréquence coupon",
-    [1, 2],
+    [1, 2, 4],
     index=1
 )
 
-market_price = st.sidebar.number_input(
-    "Prix de marché",
-    value=float(nominal),
-    step=1000.0
-)
+coupon = coupon_pct / 100
 
-# ==================================================
-# OBLIGATION
-# ==================================================
-
-bond = Bond(
-    nominal,
-    coupon_rate,
-    maturity,
-    frequency
-)
-
-# ==================================================
-# CALCULS
-# ==================================================
-
-price = bond.price(curve)
-
-duration = macaulay_duration(
-    bond,
-    curve
-)
-
-mod_duration = modified_duration(
-    bond,
-    curve
-)
-
-conv = convexity(
-    bond,
-    curve
-)
-
-dv01_value = dv01(
-    bond,
-    curve
-)
+# ==========================
+# Courbe des taux
+# ==========================
 
 try:
 
-    ytm = bond.ytm(
-        market_price
+    curve_df = pd.read_csv("courbe_taux.csv")
+
+    curve = ZeroCurve(
+        "courbe_taux.csv"
     )
 
-except Exception:
+except Exception as e:
 
-    ytm = None
+    st.error(
+        f"Erreur lors du chargement de la courbe : {e}"
+    )
 
-# ==================================================
-# TABLEAU DE BORD
-# ==================================================
+    st.stop()
 
-st.subheader("📊 Tableau de Bord")
+# ==========================
+# Construction obligation
+# ==========================
+
+try:
+
+    bond = Bond(
+        nominal,
+        coupon,
+        maturity,
+        frequency
+    )
+
+except Exception as e:
+
+    st.exception(e)
+
+    st.stop()
+
+# ==========================
+# Calcul risques
+# ==========================
+
+try:
+
+    duration_mac = macaulay_duration(
+        bond,
+        curve
+    )
+
+    taux_marche = curve.get_rate(
+        maturity
+    )
+
+    duration_mod = modified_duration(
+        duration_mac,
+        taux_marche
+    )
+
+    dv01_value = dv01(
+        nominal,
+        duration_mod
+    )
+
+except Exception as e:
+
+    st.exception(e)
+
+    st.stop()
+
+# ==========================
+# Résultats
+# ==========================
+
+st.subheader("Indicateurs de risque")
 
 col1, col2, col3 = st.columns(3)
 
 with col1:
 
     st.metric(
-        "Prix Théorique",
-        f"{price:,.2f} MAD"
+        "Duration Macaulay",
+        f"{duration_mac:.4f}"
     )
 
 with col2:
 
     st.metric(
-        "Prix Marché",
-        f"{market_price:,.2f} MAD"
+        "Duration Modifiée",
+        f"{duration_mod:.4f}"
     )
 
 with col3:
 
     st.metric(
-        "Écart",
-        f"{price - market_price:,.2f}"
-    )
-
-col4, col5, col6 = st.columns(3)
-
-with col4:
-
-    if ytm is not None:
-
-        st.metric(
-            "YTM",
-            f"{ytm*100:.2f}%"
-        )
-
-with col5:
-
-    st.metric(
-        "Duration",
-        f"{duration:.2f}"
-    )
-
-with col6:
-
-    st.metric(
-        "Duration Modifiée",
-        f"{mod_duration:.2f}"
-    )
-
-col7, col8 = st.columns(2)
-
-with col7:
-
-    st.metric(
-        "Convexité",
-        f"{conv:.2f}"
-    )
-
-with col8:
-
-    st.metric(
         "DV01",
-        f"{dv01_value:.2f}"
+        f"{dv01_value:,.2f} MAD"
     )
 
-# ==================================================
-# COURBE DES TAUX
-# ==================================================
+# ==========================
+# Diagnostic courbe
+# ==========================
 
-st.subheader("📈 Courbe Zéro Coupon")
+st.subheader("Diagnostic Courbe")
 
-curve_plot = curve_df.copy()
+diag = pd.DataFrame({
+    "Maturité": [0.25, 0.5, 1, 2, 5, 10, 15, 20, 30],
+    "Taux": [
+        curve.get_rate(0.25),
+        curve.get_rate(0.5),
+        curve.get_rate(1),
+        curve.get_rate(2),
+        curve.get_rate(5),
+        curve.get_rate(10),
+        curve.get_rate(15),
+        curve.get_rate(20),
+        curve.get_rate(30)
+    ]
+})
 
-curve_plot["Taux (%)"] = (
-    curve_plot["rate"] * 100
+st.dataframe(
+    diag,
+    use_container_width=True
 )
 
-fig_curve = px.line(
-    curve_plot,
+# ==========================
+# Graphique
+# ==========================
+
+st.subheader("Courbe des taux zéro")
+
+fig = px.line(
+    curve_df,
     x="tenor",
-    y="Taux (%)",
+    y="rate",
     markers=True
 )
 
-fig_curve.update_layout(
+fig.update_layout(
     xaxis_title="Maturité (années)",
-    yaxis_title="Taux (%)"
+    yaxis_title="Taux"
 )
 
 st.plotly_chart(
-    fig_curve,
+    fig,
     use_container_width=True
 )
 
-# ==================================================
-# ANALYSE DE SENSIBILITE
-# ==================================================
+# ==========================
+# Données marché
+# ==========================
 
-st.subheader("📉 Analyse de Sensibilité")
-
-shocks = [
-    -200,
-    -100,
-    -50,
-    0,
-    50,
-    100,
-    200
-]
-
-results = []
-
-for shock in shocks:
-
-    shifted_curve = ZeroCurve(
-        curve_df["tenor"],
-        curve_df["rate"] + shock / 10000
-    )
-
-    shocked_price = bond.price(
-        shifted_curve
-    )
-
-    results.append(
-        {
-            "Choc (pb)": shock,
-            "Prix": round(
-                shocked_price,
-                2
-            )
-        }
-    )
-
-sens_df = pd.DataFrame(results)
-
-st.dataframe(
-    sens_df,
-    use_container_width=True
-)
-
-# ==================================================
-# DONNEES COURBE
-# ==================================================
-
-with st.expander("Afficher la courbe de taux"):
-
-    affichage = curve_df.copy()
-
-    affichage["rate"] = (
-        affichage["rate"] * 100
-    )
-
-    affichage.rename(
-        columns={
-            "tenor": "Maturité",
-            "rate": "Taux (%)"
-        },
-        inplace=True
-    )
+with st.expander(
+        "Données de marché"):
 
     st.dataframe(
-        affichage,
+        curve_df,
         use_container_width=True
     )
-
-# ==================================================
-# EXPORT CSV
-# ==================================================
-
-csv_export = sens_df.to_csv(
-    index=False
-)
-
-st.download_button(
-    label="📥 Télécharger l'analyse",
-    data=csv_export,
-    file_name="analyse_sensibilite.csv",
-    mime="text/csv"
-)
-
-# ==================================================
-# FOOTER
-# ==================================================
-
-st.markdown("---")
-
-st.caption(
-    "Pricer Obligataire Maroc | Version Professionnelle"
-)
