@@ -14,69 +14,25 @@ st.set_page_config(
 
 st.title("📊 Dashboard Portefeuille Obligataire Maroc")
 
-## =====================================================
-2
-# CHARGEMENT DU PORTEFEUILLE
-3
-# =====================================================
-4
- st.sidebar.header("Chargement des données")
-6
- 
-7
+# Chargement des données
+
+st.sidebar.header("Chargement des données")
+
 fichier_portefeuille = st.sidebar.file_uploader(
-8
-"Choisir un portefeuille Excel",
-9
-type=["xlsx"]
-10
+    "Portefeuille Excel",
+    type=["xlsx"]
 )
-11
- 
-12
+
 if fichier_portefeuille is None:
-13
- 
-14
-st.info(
-15
-"Veuillez charger un portefeuille."
-16
-)
-17
- 
-18
-st.stop()
-19
- 
-20
-try:
-21
- 
-22
+    st.info(
+        "Veuillez charger un portefeuille Excel."
+    )
+    st.stop()
+
 portefeuille = pd.read_excel(
-23
-fichier_portefeuille,
-24
-engine="openpyxl"
-25
+    fichier_portefeuille,
+    engine="openpyxl"
 )
-26
- 
-27
-except Exception as e:
-28
- 
-29
-st.error(
-30
-f"Erreur chargement portefeuille : {e}"
-31
-)
-32
- 
-33
-st.stop()
 
 # =====================================================
 # NETTOYAGE DES DONNEES
