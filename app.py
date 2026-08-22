@@ -1,6 +1,9 @@
-import streamlit as st
+import os
+import zipfile
+
 import pandas as pd
 import plotly.express as px
+import streamlit as st
 
 from bond import Bond
 from courbe_zero import ZeroCurve
@@ -34,27 +37,59 @@ st.markdown(
 @st.cache_data
 def load_curve():
 
+    file_path = "courbe_taux.xlsx"
+
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(
+            f"Le fichier '{file_path}' est introuvable."
+        )
+
+    if not zipfile.is_zipfile(file_path):
+        raise ValueError(
+            "Le fichier courbe_taux.xlsx n'est pas un fichier Excel valide."
+        )
+
     df = pd.read_excel(
-        "courbe_taux.xlsx",
+        file_path,
         engine="openpyxl"
     )
 
-    df.columns = [
-        str(col).strip()
-        for col in df.columns
-    ]
+    df.columns = (
+        df.columns
+        .astype(str)
+        .str.strip()
+    )
 
     if "Taux" in df.columns:
-
         df.rename(
-            columns={
-                "Taux": "rate"
-            },
+            columns={"Taux": "rate"},
             inplace=True
         )
 
-    df["tenor"] = df["tenor"].astype(float)
-    df["rate"] = df["rate"].astype(float)
+    required_columns = ["tenor", "rate"]
+
+    missing_columns = [
+        col
+        for col in required_columns
+        if col not in df.columns
+    ]
+
+    if missing_columns:
+        raise ValueError(
+            f"Colonnes manquantes : {missing_columns}"
+        )
+
+    df["tenor"] = pd.to_numeric(
+        df["tenor"],
+        errors="coerce"
+    )
+
+    df["rate"] = pd.to_numeric(
+        df["rate"],
+        errors="coerce"
+    )
+
+    df = df.dropna()
 
     return df
 
@@ -69,6 +104,16 @@ except Exception as e:
         f"Erreur lors du chargement de courbe_taux.xlsx : {e}"
     )
 
+    st.write(
+        "Répertoire courant :",
+        os.getcwd()
+    )
+
+    st.write(
+        "Fichiers détectés :",
+        os.listdir(".")
+    )
+
     st.stop()
 
 # ==================================================
@@ -78,6 +123,28 @@ except Exception as e:
 curve = ZeroCurve(
     curve_df["tenor"],
     curve_df["rate"]
+)
+
+# ==================================================
+# AFFICHAGE COURBE DES TAUX
+# ==================================================
+
+st.subheader("Courbe des taux")
+
+fig = px.line(
+    curve_df,
+    x="tenor",
+    y="rate",
+    markers=True,
+    labels={
+        "tenor": "Maturité (années)",
+        "rate": "Taux"
+    }
+)
+
+st.plotly_chart(
+    fig,
+    use_container_width=True
 )
 
 # ==================================================
@@ -93,11 +160,13 @@ nominal = st.sidebar.number_input(
     step=10000
 )
 
-coupon_rate = st.sidebar.number_input(
-    "Coupon annuel (%)",
-    value=3.50,
-    step=0.10
-) / 100
+coupon_rate = (
+    st.sidebar.number_input(
+        "Coupon annuel (%)",
+        value=3.50,
+        step=0.10
+    ) / 100
+)
 
 maturity = st.sidebar.number_input(
     "Maturité (années)",
@@ -119,8 +188,22 @@ market_price = st.sidebar.number_input(
 )
 
 # ==================================================
-# OBLIGATION
+# CREATION OBLIGATION
 # ==================================================
 
-bond = Bond(
-)  
+try:
+
+    bond = Bond(
+        nominal=nominal,
+        coupon_rate=coupon_rate,
+        maturity=maturity,
+        frequency=frequency
+    )
+
+except Exception as e:
+
+    st.error(
+        f"Erreur lors de la création de l'obligation : {e}"
+    )
+
+    st.stop()
