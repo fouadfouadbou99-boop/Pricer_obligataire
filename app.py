@@ -1,4 +1,4 @@
-import streamlit as st
+print("""import streamlit as st
 import pandas as pd
 import plotly.express as px
 import io
@@ -328,4 +328,4 @@ st.markdown("---")
 
 st.caption(
     "Portefeuille Obligataire Maroc | Version Professionnelle"
-)
+)""")
