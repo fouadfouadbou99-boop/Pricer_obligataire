@@ -1,9 +1,6 @@
-import os
-import zipfile
-
+import streamlit as st
 import pandas as pd
 import plotly.express as px
-import streamlit as st
 
 from bond import Bond
 from courbe_zero import ZeroCurve
@@ -37,59 +34,27 @@ st.markdown(
 @st.cache_data
 def load_curve():
 
-    file_path = "courbe_taux.xlsx"
-
-    if not os.path.exists(file_path):
-        raise FileNotFoundError(
-            f"Le fichier '{file_path}' est introuvable."
-        )
-
-    if not zipfile.is_zipfile(file_path):
-        raise ValueError(
-            "Le fichier courbe_taux.xlsx n'est pas un fichier Excel valide."
-        )
-
     df = pd.read_excel(
-        file_path,
+        "courbe_taux.xlsx",
         engine="openpyxl"
     )
 
-    df.columns = (
-        df.columns
-        .astype(str)
-        .str.strip()
-    )
+    df.columns = [
+        str(col).strip()
+        for col in df.columns
+    ]
 
     if "Taux" in df.columns:
+
         df.rename(
-            columns={"Taux": "rate"},
+            columns={
+                "Taux": "rate"
+            },
             inplace=True
         )
 
-    required_columns = ["tenor", "rate"]
-
-    missing_columns = [
-        col
-        for col in required_columns
-        if col not in df.columns
-    ]
-
-    if missing_columns:
-        raise ValueError(
-            f"Colonnes manquantes : {missing_columns}"
-        )
-
-    df["tenor"] = pd.to_numeric(
-        df["tenor"],
-        errors="coerce"
-    )
-
-    df["rate"] = pd.to_numeric(
-        df["rate"],
-        errors="coerce"
-    )
-
-    df = df.dropna()
+    df["tenor"] = df["tenor"].astype(float)
+    df["rate"] = df["rate"].astype(float)
 
     return df
 
@@ -104,16 +69,6 @@ except Exception as e:
         f"Erreur lors du chargement de courbe_taux.xlsx : {e}"
     )
 
-    st.write(
-        "Répertoire courant :",
-        os.getcwd()
-    )
-
-    st.write(
-        "Fichiers détectés :",
-        os.listdir(".")
-    )
-
     st.stop()
 
 # ==================================================
@@ -123,28 +78,6 @@ except Exception as e:
 curve = ZeroCurve(
     curve_df["tenor"],
     curve_df["rate"]
-)
-
-# ==================================================
-# AFFICHAGE COURBE DES TAUX
-# ==================================================
-
-st.subheader("Courbe des taux")
-
-fig = px.line(
-    curve_df,
-    x="tenor",
-    y="rate",
-    markers=True,
-    labels={
-        "tenor": "Maturité (années)",
-        "rate": "Taux"
-    }
-)
-
-st.plotly_chart(
-    fig,
-    use_container_width=True
 )
 
 # ==================================================
@@ -160,13 +93,11 @@ nominal = st.sidebar.number_input(
     step=10000
 )
 
-coupon_rate = (
-    st.sidebar.number_input(
-        "Coupon annuel (%)",
-        value=3.50,
-        step=0.10
-    ) / 100
-)
+coupon_rate = st.sidebar.number_input(
+    "Coupon annuel (%)",
+    value=3.50,
+    step=0.10
+) / 100
 
 maturity = st.sidebar.number_input(
     "Maturité (années)",
@@ -188,22 +119,243 @@ market_price = st.sidebar.number_input(
 )
 
 # ==================================================
-# CREATION OBLIGATION
+# OBLIGATION
 # ==================================================
+
+bond = Bond(
+    nominal,
+    coupon_rate,
+    maturity,
+    frequency
+)
+
+# ==================================================
+# CALCULS
+# ==================================================
+
+price = bond.price(curve)
+
+duration = macaulay_duration(
+    bond,
+    curve
+)
+
+mod_duration = modified_duration(
+    bond,
+    curve
+)
+
+conv = convexity(
+    bond,
+    curve
+)
+
+dv01_value = dv01(
+    bond,
+    curve
+)
 
 try:
 
-    bond = Bond(
-        nominal=nominal,
-        coupon_rate=coupon_rate,
-        maturity=maturity,
-        frequency=frequency
+    ytm = bond.ytm(
+        market_price
     )
 
-except Exception as e:
+except Exception:
 
-    st.error(
-        f"Erreur lors de la création de l'obligation : {e}"
+    ytm = None
+
+# ==================================================
+# TABLEAU DE BORD
+# ==================================================
+
+st.subheader("📊 Tableau de Bord")
+
+col1, col2, col3 = st.columns(3)
+
+with col1:
+
+    st.metric(
+        "Prix Théorique",
+        f"{price:,.2f} MAD"
     )
 
-    st.stop()
+with col2:
+
+    st.metric(
+        "Prix Marché",
+        f"{market_price:,.2f} MAD"
+    )
+
+with col3:
+
+    st.metric(
+        "Écart",
+        f"{price - market_price:,.2f}"
+    )
+
+col4, col5, col6 = st.columns(3)
+
+with col4:
+
+    if ytm is not None:
+
+        st.metric(
+            "YTM",
+            f"{ytm*100:.2f}%"
+        )
+
+with col5:
+
+    st.metric(
+        "Duration",
+        f"{duration:.2f}"
+    )
+
+with col6:
+
+    st.metric(
+        "Duration Modifiée",
+        f"{mod_duration:.2f}"
+    )
+
+col7, col8 = st.columns(2)
+
+with col7:
+
+    st.metric(
+        "Convexité",
+        f"{conv:.2f}"
+    )
+
+with col8:
+
+    st.metric(
+        "DV01",
+        f"{dv01_value:.2f}"
+    )
+
+# ==================================================
+# COURBE DES TAUX
+# ==================================================
+
+st.subheader("📈 Courbe Zéro Coupon")
+
+curve_plot = curve_df.copy()
+
+curve_plot["Taux (%)"] = (
+    curve_plot["rate"] * 100
+)
+
+fig_curve = px.line(
+    curve_plot,
+    x="tenor",
+    y="Taux (%)",
+    markers=True
+)
+
+fig_curve.update_layout(
+    xaxis_title="Maturité (années)",
+    yaxis_title="Taux (%)"
+)
+
+st.plotly_chart(
+    fig_curve,
+    use_container_width=True
+)
+
+# ==================================================
+# ANALYSE DE SENSIBILITE
+# ==================================================
+
+st.subheader("📉 Analyse de Sensibilité")
+
+shocks = [
+    -200,
+    -100,
+    -50,
+    0,
+    50,
+    100,
+    200
+]
+
+results = []
+
+for shock in shocks:
+
+    shifted_curve = ZeroCurve(
+        curve_df["tenor"],
+        curve_df["rate"] + shock / 10000
+    )
+
+    shocked_price = bond.price(
+        shifted_curve
+    )
+
+    results.append(
+        {
+            "Choc (pb)": shock,
+            "Prix": round(
+                shocked_price,
+                2
+            )
+        }
+    )
+
+sens_df = pd.DataFrame(results)
+
+st.dataframe(
+    sens_df,
+    use_container_width=True
+)
+
+# ==================================================
+# DONNEES COURBE
+# ==================================================
+
+with st.expander("Afficher la courbe de taux"):
+
+    affichage = curve_df.copy()
+
+    affichage["rate"] = (
+        affichage["rate"] * 100
+    )
+
+    affichage.rename(
+        columns={
+            "tenor": "Maturité",
+            "rate": "Taux (%)"
+        },
+        inplace=True
+    )
+
+    st.dataframe(
+        affichage,
+        use_container_width=True
+    )
+
+# ==================================================
+# EXPORT CSV
+# ==================================================
+
+csv_export = sens_df.to_csv(
+    index=False
+)
+
+st.download_button(
+    label="📥 Télécharger l'analyse",
+    data=csv_export,
+    file_name="analyse_sensibilite.csv",
+    mime="text/csv"
+)
+
+# ==================================================
+# FOOTER
+# ==================================================
+
+st.markdown("---")
+
+st.caption(
+    "Pricer Obligataire Maroc | Version Professionnelle"
+)
