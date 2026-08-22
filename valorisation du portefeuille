@@ -1,0 +1,6 @@
+def portfolio_market_value(df):
+
+    return (
+        df[
+            "Nominal Global"
+        ]
