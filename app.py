@@ -14,38 +14,71 @@ st.set_page_config(
 
 st.title("📊 Dashboard Portefeuille Obligataire Maroc")
 
+## =====================================================
+2
+# CHARGEMENT DU PORTEFEUILLE
+3
 # =====================================================
-# CHARGEMENT DES DONNEES
-# =====================================================
-
+4
+ 
+5
+st.sidebar.header("Chargement des données")
+6
+ 
+7
+fichier_portefeuille = st.sidebar.file_uploader(
+8
+"Choisir un portefeuille Excel",
+9
+type=["xlsx"]
+10
+)
+11
+ 
+12
+if fichier_portefeuille is None:
+13
+ 
+14
+st.info(
+15
+"Veuillez charger un portefeuille."
+16
+)
+17
+ 
+18
+st.stop()
+19
+ 
+20
 try:
-
-    portefeuille = pd.read_excel(
-        "RPC_bonds_data_rpc.xlsx",
-        engine="openpyxl"
-    )
-
+21
+ 
+22
+portefeuille = pd.read_excel(
+23
+fichier_portefeuille,
+24
+engine="openpyxl"
+25
+)
+26
+ 
+27
 except Exception as e:
-
-    st.error(
-        f"Erreur lors du chargement du portefeuille : {e}"
-    )
-
-    st.stop()
-
-try:
-
-    courbe = pd.read_csv(
-        "courbe_taux.csv"
-    )
-
-except Exception as e:
-
-    st.error(
-        f"Erreur lors du chargement de la courbe : {e}"
-    )
-
-    st.stop()
+28
+ 
+29
+st.error(
+30
+f"Erreur chargement portefeuille : {e}"
+31
+)
+32
+ 
+33
+st.stop()
 
 # =====================================================
 # NETTOYAGE DES DONNEES
