@@ -1,4 +1,4 @@
-from cashflows import generate_cashflows
+from modules.cashflows import generate_cashflows
 
 
 def price_bond(
