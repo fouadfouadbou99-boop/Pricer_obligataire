@@ -1,28 +1,26 @@
 import pandas as pd
 
 
-def executive_summary(
-    price,
-    ytm,
-    duration,
-    mod_duration,
-    convexity,
-    dv01
-):
+def build_summary(
+        portfolio_value,
+        duration,
+        dv01_total):
 
     return pd.DataFrame({
 
-        "Indicateur":[
-            "Prix",
-            "YTM",
+        "Indicateur": [
+
+            "Valeur Marché",
             "Duration",
-            "Duration Modifiee",
-            "Convexite",
             "DV01"
+
         ],
 
-        "Valeur":[
+        "Valeur": [
 
-            round(price,2),
+            portfolio_value,
+            duration,
+            dv01_total
 
- 
+        ]
+    })
