@@ -36,17 +36,13 @@ type=["xlsx"]
 14
 )
 15
- 
-16
-try:
+ try:
 17
  
 18
 if fichier_portefeuille is not None:
 19
- 
-20
-portefeuille = pd.read_excel(
+ portefeuille = pd.read_excel(
 21
 fichier_portefeuille,
 22
@@ -61,13 +57,7 @@ st.sidebar.success(
 "Portefeuille chargé"
 27
 )
-28
- 
-29
 else:
-30
- 
-31
 portefeuille = pd.read_excel(
 32
 "RPC_bonds_data_rpc.xlsx",
@@ -75,32 +65,22 @@ portefeuille = pd.read_excel(
 engine="openpyxl"
 34
 )
-35
- 
 36
 except Exception as e:
-37
- 
 38
 st.error(
 39
 f"Erreur chargement portefeuille : {e}"
 40
 )
-41
- 
 42
 st.stop()
-43
- 
 44
 # ----------------------------------------
 45
 # COURBE DES TAUX
 46
 # ----------------------------------------
-47
- 
 48
 fichier_courbe = st.sidebar.file_uploader(
 49
@@ -109,32 +89,20 @@ fichier_courbe = st.sidebar.file_uploader(
 type=["xlsx", "csv"]
 51
 )
-52
- 
 53
 try:
-54
-
 55
 if fichier_courbe is not None:
-56
- 
 57
 if fichier_courbe.name.endswith(".csv"):
-58
- 
 59
 courbe = pd.read_csv(
 60
 fichier_courbe
 61
 )
-62
- 
 63
 else:
-64
- 
 65
 courbe = pd.read_excel(
 66
@@ -143,32 +111,22 @@ fichier_courbe,
 engine="openpyxl"
 68
 )
-69
- 
 70
 st.sidebar.success(
 71
 "Courbe chargée"
 72
 )
-73
- 
 74
 else:
-75
- 
 76
 courbe = pd.read_csv(
 77
 "courbe_taux.csv"
 78
 )
-79
- 
 80
 except Exception as e:
-81
- 
 82
 st.error(
 83
@@ -185,12 +143,8 @@ st.stop()
 # COURBE DES TAUX
 3
 # ==================================================
-4
- 
 5
 st.subheader("📈 Courbe des Taux")
-6
- 
 7
 courbe.columns = [
 8
@@ -199,12 +153,8 @@ str(col).strip()
 for col in courbe.columns
 10
 ]
-11
- 
 12
 if "Taux" in courbe.columns:
-13
- 
 14
 courbe.rename(
 15
@@ -217,8 +167,6 @@ columns={
 inplace=True
 19
 )
-20
- 
 21
 fig = px.line(
 22
@@ -231,8 +179,6 @@ y="rate",
 markers=True
 26
 )
-27
- 
 28
 fig.update_layout(
 29
@@ -241,8 +187,6 @@ xaxis_title="Maturité",
 yaxis_title="Taux"
 31
 )
-32
- 
 33
 st.plotly_chart(
 34
