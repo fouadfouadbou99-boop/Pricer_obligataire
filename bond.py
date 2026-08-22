@@ -50,4 +50,27 @@ class Bond:
 
         for t, cf in self.cashflows():
 
-            rate = curve.get_
+            rate = curve.get_rate(t)
+
+            value += cf / ((1 + rate) ** t)
+
+        return value
+
+    def ytm(self, market_price):
+
+        def objective(y):
+
+            value = 0
+
+            for t, cf in self.cashflows():
+
+                value += cf / ((1 + y) ** t)
+
+            return value - market_price
+
+        return float(
+            newton(
+                objective,
+                0.05
+            )
+        )
