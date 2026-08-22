@@ -1,15 +1,17 @@
 import numpy as np
+import pandas as pd
 
 
 def generate_cashflows(bond):
 
     n = int(
-        bond.maturity * bond.frequency
+        bond.maturity *
+        bond.frequency
     )
 
     coupon_cf = (
         bond.nominal *
-        bond.coupon /
+        bond.coupon_rate /
         bond.frequency
     )
 
@@ -22,4 +24,9 @@ def generate_cashflows(bond):
 
     cashflows[-1] += bond.nominal
 
-    return times, cashflows
+    return pd.DataFrame(
+        {
+            "Maturite": times,
+            "Flux": cashflows
+        }
+    )
