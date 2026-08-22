@@ -1,0 +1,11 @@
+import plotly.express as px
+
+
+def curve_chart(df):
+
+    return px.line(
+        df,
+        x="tenor",
+        y="rate",
+        markers=True
+    )
