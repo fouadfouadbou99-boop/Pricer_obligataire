@@ -21,14 +21,14 @@ class Bond:
         flows = []
 
         n = int(
-            self.maturity
-            * self.frequency
+            self.maturity *
+            self.frequency
         )
 
         coupon = (
-            self.nominal
-            * self.coupon_rate
-            / self.frequency
+            self.nominal *
+            self.coupon_rate /
+            self.frequency
         )
 
         for i in range(1, n + 1):
@@ -40,16 +40,11 @@ class Bond:
             if i == n:
                 cf += self.nominal
 
-            flows.append(
-                (t, cf)
-            )
+            flows.append((t, cf))
 
         return flows
 
-    def price(
-        self,
-        curve
-    ):
+    def price(self, curve):
 
         value = 0
 
@@ -57,20 +52,25 @@ class Bond:
 
             rate = curve.get_rate(t)
 
-            value += (
-                cf /
-                ((1 + rate) ** t)
-            )
+            value += cf / ((1 + rate) ** t)
 
         return value
 
-    def ytm(
-        self,
-        market_price
-    ):
+    def ytm(self, market_price):
 
         def objective(y):
 
             value = 0
 
-            for t, cf in self.
+            for t, cf in self.cashflows():
+
+                value += cf / ((1 + y) ** t)
+
+            return value - market_price
+
+        return float(
+            newton(
+                objective,
+                0.05
+            )
+        )
