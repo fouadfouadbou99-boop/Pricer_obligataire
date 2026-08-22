@@ -28,7 +28,7 @@ try:
 except Exception as e:
 
     st.error(
-        f"Erreur chargement portefeuille : {e}"
+        f"Erreur lors du chargement du portefeuille : {e}"
     )
 
     st.stop()
@@ -42,13 +42,13 @@ try:
 except Exception as e:
 
     st.error(
-        f"Erreur chargement courbe : {e}"
+        f"Erreur lors du chargement de la courbe : {e}"
     )
 
     st.stop()
 
 # =====================================================
-# PREPARATION DES DONNEES
+# NETTOYAGE DES DONNEES
 # =====================================================
 
 portefeuille.columns = [
@@ -56,44 +56,52 @@ portefeuille.columns = [
     for col in portefeuille.columns
 ]
 
-numeric_cols = [
+for colonne in [
     "Nominal Global",
     "Taux facial",
     "TRA"
-]
+]:
 
-for col in numeric_cols:
+    if colonne in portefeuille.columns:
 
-    if col in portefeuille.columns:
-
-        portefeuille[col] = pd.to_numeric(
-            portefeuille[col],
+        portefeuille[colonne] = pd.to_numeric(
+            portefeuille[colonne],
             errors="coerce"
         )
 
 # =====================================================
-# KPI
+# INDICATEURS CLES
 # =====================================================
 
-nominal_total = portefeuille[
-    "Nominal Global"
-].fillna(0).sum()
+nominal_total = 0
+coupon_moyen = 0
+tra_moyen = 0
 
-nombre_positions = len(
-    portefeuille
-)
+if "Nominal Global" in portefeuille.columns:
 
-coupon_moyen = (
-    portefeuille["Taux facial"]
-    .fillna(0)
-    .mean()
-) * 100
+    nominal_total = portefeuille[
+        "Nominal Global"
+    ].fillna(0).sum()
 
-tra_moyen = (
-    portefeuille["TRA"]
-    .fillna(0)
-    .mean()
-) * 100
+if "Taux facial" in portefeuille.columns:
+
+    coupon_moyen = (
+        portefeuille["Taux facial"]
+        .fillna(0)
+        .mean()
+        * 100
+    )
+
+if "TRA" in portefeuille.columns:
+
+    tra_moyen = (
+        portefeuille["TRA"]
+        .fillna(0)
+        .mean()
+        * 100
+    )
+
+nombre_positions = len(portefeuille)
 
 col1, col2, col3, col4 = st.columns(4)
 
@@ -126,14 +134,201 @@ with col4:
     )
 
 # =====================================================
-# PORTFOLIO
+# TABLEAU PORTEFEUILLE
 # =====================================================
 
-st.subheader("Portefeuille")
+st.subheader("Portefeuille Obligataire")
 
-colonnes = 
-
+colonnes = [
     "Code",
     "Description Titres",
-    "Date Echéance"
-   
+    "Date Echéance",
+    "Taux facial",
+    "Nominal Global",
+    "TRA"
+]
+
+colonnes_existantes = [
+    c
+    for c in colonnes
+    if c in portefeuille.columns
+]
+
+st.dataframe(
+    portefeuille[colonnes_existantes],
+    use_container_width=True
+)
+
+# =====================================================
+# TOP POSITIONS
+# =====================================================
+
+if (
+    "Nominal Global" in portefeuille.columns
+    and
+    "Description Titres" in portefeuille.columns
+):
+
+    st.subheader("Top 10 Positions")
+
+    top10 = portefeuille.nlargest(
+        10,
+        "Nominal Global"
+    )
+
+    fig_top = px.bar(
+        top10,
+        x="Description Titres",
+        y="Nominal Global",
+        title="Top 10 des positions"
+    )
+
+    st.plotly_chart(
+        fig_top,
+        use_container_width=True
+    )
+
+# =====================================================
+# REPARTITION DES ENCOURS
+# =====================================================
+
+if (
+    "Nominal Global" in portefeuille.columns
+    and
+    "Description Titres" in portefeuille.columns
+):
+
+    st.subheader("Répartition des Encours")
+
+    top15 = portefeuille.nlargest(
+        15,
+        "Nominal Global"
+    )
+
+    fig_pie = px.pie(
+        top15,
+        values="Nominal Global",
+        names="Description Titres"
+    )
+
+    st.plotly_chart(
+        fig_pie,
+        use_container_width=True
+    )
+
+# =====================================================
+# COURBE DES TAUX
+# =====================================================
+
+st.subheader("Courbe des Taux")
+
+fig_curve = px.line(
+    courbe,
+    x="tenor",
+    y="rate",
+    markers=True
+)
+
+fig_curve.update_layout(
+    xaxis_title="Maturité",
+    yaxis_title="Taux"
+)
+
+st.plotly_chart(
+    fig_curve,
+    use_container_width=True
+)
+
+# =====================================================
+# DONNEES COURBE
+# =====================================================
+
+with st.expander(
+    "Afficher les données de la courbe"
+):
+
+    st.dataframe(
+        courbe,
+        use_container_width=True
+    )
+
+# =====================================================
+# DISTRIBUTION TRA
+# =====================================================
+
+if "TRA" in portefeuille.columns:
+
+    st.subheader("Distribution des TRA")
+
+    fig_tra = px.histogram(
+        portefeuille,
+        x="TRA",
+        nbins=20
+    )
+
+    st.plotly_chart(
+        fig_tra,
+        use_container_width=True
+    )
+
+# =====================================================
+# DISTRIBUTION COUPONS
+# =====================================================
+
+if "Taux facial" in portefeuille.columns:
+
+    st.subheader(
+        "Distribution des Coupons"
+    )
+
+    fig_coupon = px.histogram(
+        portefeuille,
+        x="Taux facial",
+        nbins=20
+    )
+
+    st.plotly_chart(
+        fig_coupon,
+        use_container_width=True
+    )
+
+# =====================================================
+# EXPORT
+# =====================================================
+
+@st.cache_data
+def exporter_excel(df):
+
+    from io import BytesIO
+
+    buffer = BytesIO()
+
+    with pd.ExcelWriter(
+        buffer,
+        engine="openpyxl"
+    ) as writer:
+
+        df.to_excel(
+            writer,
+            index=False
+        )
+
+    return buffer.getvalue()
+
+
+st.download_button(
+    label="📥 Télécharger le portefeuille",
+    data=exporter_excel(portefeuille),
+    file_name="portefeuille.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+)
+
+# =====================================================
+# PIED DE PAGE
+# =====================================================
+
+st.markdown("---")
+
+st.caption(
+    "Dashboard Obligataire Maroc - Version Portefeuille"
+)
