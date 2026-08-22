@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-from io import BytesIO
+import io
 
 # ==================================================
 # CONFIGURATION
@@ -16,40 +16,26 @@ st.set_page_config(
 st.title("📊 Dashboard Portefeuille Obligataire Maroc")
 
 # ==================================================
-# FONCTIONS UTILES
+# FONCTIONS
 # ==================================================
 
-def format_montant(x):
-    if pd.isna(x):
-        return "0 MAD"
+@st.cache_data
+def charger_portefeuille(fichier):
+    return pd.read_excel(fichier, engine="openpyxl")
 
-    if x >= 1_000_000_000:
-        return f"{x/1_000_000_000:.2f} MMDH"
+@st.cache_data
+def charger_courbe_excel(fichier):
+    return pd.read_excel(fichier, engine="openpyxl")
 
-    if x >= 1_000_000:
-        return f"{x/1_000_000:.2f} MDH"
-
-    return f"{x:,.0f} MAD"
-
-
-def telecharger_excel(df):
-    output = BytesIO()
-
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False)
-
-    return output.getvalue()
-
+@st.cache_data
+def charger_courbe_csv(fichier):
+    return pd.read_csv(fichier)
 
 # ==================================================
-# CHARGEMENT DES DONNEES
+# CHARGEMENT PORTFEUILLE
 # ==================================================
 
 st.sidebar.header("📂 Chargement des données")
-
-# -----------------------------
-# Portefeuille
-# -----------------------------
 
 fichier_portefeuille = st.sidebar.file_uploader(
     "📁 Charger le portefeuille",
@@ -59,29 +45,23 @@ fichier_portefeuille = st.sidebar.file_uploader(
 try:
 
     if fichier_portefeuille is not None:
-
-        portefeuille = pd.read_excel(
-            fichier_portefeuille,
-            engine="openpyxl"
+        portefeuille = charger_portefeuille(
+            fichier_portefeuille
         )
-
-        st.sidebar.success("✅ Portefeuille chargé")
-
     else:
-
-        portefeuille = pd.read_excel(
-            "RPC_bonds_data_rpc.xlsx",
-            engine="openpyxl"
+        portefeuille = charger_portefeuille(
+            "RPC_bonds_data_rpc.xlsx"
         )
+
+    st.sidebar.success("✅ Portefeuille chargé")
 
 except Exception as e:
-
     st.error(f"Erreur portefeuille : {e}")
     st.stop()
 
-# -----------------------------
-# Courbe
-# -----------------------------
+# ==================================================
+# CHARGEMENT COURBE
+# ==================================================
 
 fichier_courbe = st.sidebar.file_uploader(
     "📈 Charger la courbe des taux",
@@ -93,15 +73,16 @@ try:
     if fichier_courbe is not None:
 
         if fichier_courbe.name.endswith(".csv"):
-            courbe = pd.read_csv(fichier_courbe)
 
-        else:
-            courbe = pd.read_excel(
-                fichier_courbe,
-                engine="openpyxl"
+            courbe = charger_courbe_csv(
+                fichier_courbe
             )
 
-        st.sidebar.success("✅ Courbe chargée")
+        else:
+
+            courbe = charger_courbe_excel(
+                fichier_courbe
+            )
 
     else:
 
@@ -109,17 +90,31 @@ try:
             "courbe_taux.csv"
         )
 
+    st.sidebar.success("✅ Courbe chargée")
+
 except Exception as e:
 
-    st.error(f"Erreur courbe : {e}")
+    st.error(
+        f"Erreur courbe : {e}"
+    )
+
     st.stop()
 
 # ==================================================
-# NETTOYAGE
+# NORMALISATION
 # ==================================================
 
-portefeuille.columns = portefeuille.columns.astype(str).str.strip()
-courbe.columns = courbe.columns.astype(str).str.strip()
+portefeuille.columns = (
+    portefeuille.columns
+    .astype(str)
+    .str.strip()
+)
+
+courbe.columns = (
+    courbe.columns
+    .astype(str)
+    .str.strip()
+)
 
 if "Taux" in courbe.columns:
     courbe.rename(
@@ -128,25 +123,29 @@ if "Taux" in courbe.columns:
     )
 
 # ==================================================
-# CONVERSIONS
+# PREPARATION
 # ==================================================
 
-colonnes_numeriques = [
-    "Taux facial",
-    "TRA",
-    "Nominal Global",
-    "Quantité",
-    "Spread"
-]
+if "Date Echéance" in portefeuille.columns:
 
-for col in colonnes_numeriques:
+    portefeuille["Date Echéance"] = pd.to_datetime(
+        portefeuille["Date Echéance"],
+        errors="coerce"
+    )
 
-    if col in portefeuille.columns:
+if "Taux facial" in portefeuille.columns:
 
-        portefeuille[col] = pd.to_numeric(
-            portefeuille[col],
-            errors="coerce"
-        )
+    portefeuille["Taux facial"] = pd.to_numeric(
+        portefeuille["Taux facial"],
+        errors="coerce"
+    )
+
+if "Nominal Global" in portefeuille.columns:
+
+    portefeuille["Nominal Global"] = pd.to_numeric(
+        portefeuille["Nominal Global"],
+        errors="coerce"
+    )
 
 # ==================================================
 # KPI
@@ -159,179 +158,116 @@ nominal_total = portefeuille.get(
 
 nombre_positions = len(portefeuille)
 
-coupon_moyen = 0
-
-if {
+coupon_moyen = portefeuille.get(
     "Taux facial",
-    "Nominal Global"
-}.issubset(portefeuille.columns):
+    pd.Series(dtype=float)
+).fillna(0).mean()
 
-    coupon_moyen = (
-        portefeuille["Taux facial"]
-        * portefeuille["Nominal Global"]
-    ).sum() / portefeuille["Nominal Global"].sum()
+if coupon_moyen < 1:
+    coupon_moyen *= 100
 
-coupon_moyen *= 100
-
-tra_moyen = 0
-
-if {
-    "TRA",
-    "Nominal Global"
-}.issubset(portefeuille.columns):
-
-    tra_moyen = (
-        portefeuille["TRA"]
-        * portefeuille["Nominal Global"]
-    ).sum() / portefeuille["Nominal Global"].sum()
-
-tra_moyen *= 100
-
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3 = st.columns(3)
 
 with col1:
+
     st.metric(
         "Nominal Total",
-        format_montant(nominal_total)
+        f"{nominal_total:,.0f}".replace(",", " ")
+        + " MAD"
     )
 
 with col2:
+
     st.metric(
         "Nombre de lignes",
         nombre_positions
     )
 
 with col3:
+
     st.metric(
-        "Coupon Moyen Pondéré",
+        "Coupon Moyen",
         f"{coupon_moyen:.2f}%"
     )
 
-with col4:
-    st.metric(
-        "TRA Moyen Pondéré",
-        f"{tra_moyen:.2f}%"
+# ==================================================
+# VALORISATION
+# ==================================================
+
+st.subheader("💰 Valorisation approximative")
+
+try:
+
+    today = pd.Timestamp.today()
+
+    portefeuille["Maturite"] = (
+        portefeuille["Date Echéance"]
+        - today
+    ).dt.days / 365.25
+
+    portefeuille["Maturite"] = (
+        portefeuille["Maturite"]
+        .clip(lower=0)
+    )
+
+    portefeuille["Valeur Marche"] = (
+        portefeuille["Nominal Global"]
+        /
+        (
+            (1 + portefeuille["Taux facial"])
+            ** portefeuille["Maturite"]
+        )
+    )
+
+    vm = portefeuille[
+        "Valeur Marche"
+    ].sum()
+
+    pnl = vm - nominal_total
+
+    c1, c2 = st.columns(2)
+
+    with c1:
+
+        st.metric(
+            "Valeur de Marché",
+            f"{vm:,.0f}".replace(",", " ")
+            + " MAD"
+        )
+
+    with c2:
+
+        st.metric(
+            "Plus / Moins Value",
+            f"{pnl:,.0f}".replace(",", " ")
+            + " MAD"
+        )
+
+except:
+
+    st.info(
+        "Valorisation non disponible."
     )
 
 # ==================================================
-# TABLEAU PORTEFEUILLE
+# ONGLETS
 # ==================================================
 
-st.subheader("📁 Portefeuille")
-
-colonnes = [
-    "Code",
-    "Description Titres",
-    "Date Echéance",
-    "Taux facial",
-    "Quantité",
-    "Nominal Global",
-    "Spread",
-    "TRA"
-]
-
-colonnes_existantes = [
-    c for c in colonnes
-    if c in portefeuille.columns
-]
-
-st.dataframe(
-    portefeuille[colonnes_existantes],
-    use_container_width=True,
-    height=500
-)
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📁 Portefeuille",
+    "📈 Courbe",
+    "🥧 Analyse",
+    "⬇ Export"
+])
 
 # ==================================================
-# EXPORT EXCEL
+# PORTEFEUILLE
 # ==================================================
 
-fichier_excel = telecharger_excel(portefeuille)
+with tab1:
 
-st.download_button(
-    label="📥 Télécharger le portefeuille",
-    data=fichier_excel,
-    file_name="portefeuille_obligataire.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-)
-
-# ==================================================
-# GRAPHIQUES
-# ==================================================
-
-st.subheader("📊 Analyse du portefeuille")
-
-colg1, colg2 = st.columns(2)
-
-# -----------------------------
-# Top titres
-# -----------------------------
-
-with colg1:
-
-    if {
-        "Description Titres",
-        "Nominal Global"
-    }.issubset(portefeuille.columns):
-
-        top = portefeuille.sort_values(
-            "Nominal Global",
-            ascending=False
-        ).head(10)
-
-        fig = px.bar(
-            top,
-            x="Nominal Global",
-            y="Description Titres",
-            orientation="h",
-            title="Top 10 Encours"
-        )
-
-        st.plotly_chart(
-            fig,
-            use_container_width=True
-        )
-
-# -----------------------------
-# Répartition TRA
-# -----------------------------
-
-with colg2:
-
-    if "TRA" in portefeuille.columns:
-
-        fig = px.histogram(
-            portefeuille,
-            x="TRA",
-            nbins=20,
-            title="Distribution des TRA"
-        )
-
-        st.plotly_chart(
-            fig,
-            use_container_width=True
-        )
-
-# ==================================================
-# REPARTITION PAR ECHEANCE
-# ==================================================
-
-if "Date Echéance" in portefeuille.columns:
-
-    st.subheader("📅 Répartition des échéances")
-
-    portefeuille["Date Echéance"] = pd.to_datetime(
-        portefeuille["Date Echéance"],
-        errors="coerce"
-    )
-
-    fig = px.histogram(
+    st.dataframe(
         portefeuille,
-        x="Date Echéance",
-        title="Répartition des maturités"
-    )
-
-    st.plotly_chart(
-        fig,
         use_container_width=True
     )
 
@@ -339,55 +275,92 @@ if "Date Echéance" in portefeuille.columns:
 # COURBE DES TAUX
 # ==================================================
 
-st.subheader("📈 Courbe des Taux")
+with tab2:
 
-try:
+    try:
 
-    fig = px.line(
-        courbe,
-        x="tenor",
-        y="rate",
-        markers=True,
-        title="Courbe des taux"
-    )
+        fig = px.line(
+            courbe,
+            x="tenor",
+            y="rate",
+            markers=True,
+            title="Courbe des taux"
+        )
 
-    fig.update_layout(
-        xaxis_title="Maturité (années)",
-        yaxis_title="Taux",
-        hovermode="x unified"
-    )
+        st.plotly_chart(
+            fig,
+            use_container_width=True
+        )
 
-    st.plotly_chart(
-        fig,
-        use_container_width=True
-    )
+    except Exception as e:
 
-except Exception as e:
-
-    st.error(
-        f"Erreur graphique : {e}"
-    )
+        st.error(e)
 
 # ==================================================
-# DONNEES COURBE
+# ANALYSE
 # ==================================================
 
-with st.expander(
-    "Afficher les données de la courbe"
-):
+with tab3:
 
-    st.dataframe(
-        courbe,
-        use_container_width=True
+    if (
+        "Description Titres"
+        in portefeuille.columns
+    ):
+
+        fig_pie = px.pie(
+            portefeuille,
+            names="Description Titres",
+            values="Nominal Global",
+            title="Répartition du portefeuille"
+        )
+
+        st.plotly_chart(
+            fig_pie,
+            use_container_width=True
+        )
+
+    if (
+        "Date Echéance"
+        in portefeuille.columns
+    ):
+
+        fig_hist = px.histogram(
+            portefeuille,
+            x="Date Echéance",
+            y="Nominal Global",
+            title="Echéancier des maturités"
+        )
+
+        st.plotly_chart(
+            fig_hist,
+            use_container_width=True
+        )
+
+# ==================================================
+# EXPORT
+# ==================================================
+
+with tab4:
+
+    buffer = io.BytesIO()
+
+    with pd.ExcelWriter(
+        buffer,
+        engine="openpyxl"
+    ) as writer:
+
+        portefeuille.to_excel(
+            writer,
+            index=False,
+            sheet_name="Portefeuille"
+        )
+
+    st.download_button(
+        label="📥 Télécharger le portefeuille",
+        data=buffer.getvalue(),
+        file_name="portefeuille_export.xlsx",
+        mime="application/vnd.ms-excel"
     )
-
-# ==================================================
-# STATISTIQUES
-# ==================================================
-
-st.subheader("📋 Statistiques")
-
-st.write(portefeuille.describe())
 
 # ==================================================
 # FOOTER
@@ -396,5 +369,5 @@ st.write(portefeuille.describe())
 st.markdown("---")
 
 st.caption(
-    "Dashboard Obligataire Maroc - Version Améliorée"
+    "Portefeuille Obligataire Maroc | Version Professionnelle"
 )
