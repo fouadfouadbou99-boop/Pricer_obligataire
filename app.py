@@ -20,9 +20,7 @@ st.title("📊 Dashboard Portefeuille Obligataire Maroc")
 3
 # =====================================================
 4
- 
-5
-st.sidebar.header("Chargement des données")
+ st.sidebar.header("Chargement des données")
 6
  
 7
