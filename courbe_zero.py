@@ -1,19 +1,15 @@
+import pandas as pd
 import numpy as np
 
 
 class ZeroCurve:
 
-    def __init__(self, tenors, rates):
+    def __init__(self, file_path):
 
-        self.tenors = np.array(
-            tenors,
-            dtype=float
-        )
+        df = pd.read_csv(file_path)
 
-        self.rates = np.array(
-            rates,
-            dtype=float
-        )
+        self.tenors = df["tenor"].astype(float).values
+        self.rates = df["rate"].astype(float).values
 
     def get_rate(self, maturity):
 
@@ -23,11 +19,4 @@ class ZeroCurve:
                 self.tenors,
                 self.rates
             )
-        )
-
-    def parallel_shift(self, shift):
-
-        return ZeroCurve(
-            self.tenors,
-            self.rates + shift
         )
