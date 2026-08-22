@@ -15,182 +15,91 @@ st.set_page_config(
 st.title("📊 Dashboard Portefeuille Obligataire Maroc")
 
 # ==================================================
-2
 # CHARGEMENT DES DONNEES
-3
 # ==================================================
-4
-st.sidebar.header("📂 Chargement des données")
-7
-# ----------------------------------------
-8
-# PORTEFEUILLE
-9
-# ----------------------------------------
-10
-fichier_portefeuille = st.sidebar.file_uploader(
-12
-"📁 Charger le portefeuille",
-13
-type=["xlsx"]
-14
-)
-15
- try:
-18
-if fichier_portefeuille is not None:
-19
- portefeuille = pd.read_excel(
-21
-fichier_portefeuille,
-22
-engine="openpyxl"
-23
-)
-25
-st.sidebar.success(
-26
-"Portefeuille chargé"
-27
-)
-else:
-portefeuille = pd.read_excel(
-32
-"RPC_bonds_data_rpc.xlsx",
-33
-engine="openpyxl"
-34
-)
-36
-except Exception as e:
-38
-st.error(
-39
-f"Erreur chargement portefeuille : {e}"
-40
-)
-42
-st.stop()
-44
-# ----------------------------------------
-45
-# COURBE DES TAUX
-46
-# ----------------------------------------
-48
-fichier_courbe = st.sidebar.file_uploader(
-49
-"📈 Charger la courbe des taux",
-50
-type=["xlsx", "csv"]
-51
-)
-53
-try:
-55
-if fichier_courbe is not None:
-57
-if fichier_courbe.name.endswith(".csv"):
-59
-courbe = pd.read_csv(
-60
-fichier_courbe
-61
-)
-63
-else:
-65
-courbe = pd.read_excel(
-66
-fichier_courbe,
-67
-engine="openpyxl"
-68
-)
-70
-st.sidebar.success(
-71
-"Courbe chargée"
-72
-)
-74
-else:
-76
-courbe = pd.read_csv(
-77
-"courbe_taux.csv"
-78
-)
-80
-except Exception as e:
-82
-st.error(
-83
-f"Erreur chargement courbe : {e}"
-84
-)
-85
- 
-86
-st.stop()
 
-# ==================================================
-2
-# COURBE DES TAUX
-3
-# ==================================================
-5
-st.subheader("📈 Courbe des Taux")
-7
-courbe.columns = [
-8
-str(col).strip()
-9
-for col in courbe.columns
-10
-]
-12
-if "Taux" in courbe.columns:
-14
-courbe.rename(
-15
-columns={
-16
-"Taux": "rate"
-17
-},
-18
-inplace=True
-19
+st.sidebar.header("📂 Chargement des données")
+
+# -----------------------------
+# Portefeuille
+# -----------------------------
+
+fichier_portefeuille = st.sidebar.file_uploader(
+    "📁 Charger le portefeuille",
+    type=["xlsx"]
 )
-21
-fig = px.line(
-22
-courbe,
-23
-x="tenor",
-24
-y="rate",
-25
-markers=True
-26
+
+try:
+
+    if fichier_portefeuille is not None:
+
+        portefeuille = pd.read_excel(
+            fichier_portefeuille,
+            engine="openpyxl"
+        )
+
+        st.sidebar.success(
+            "Portefeuille chargé"
+        )
+
+    else:
+
+        portefeuille = pd.read_excel(
+            "RPC_bonds_data_rpc.xlsx",
+            engine="openpyxl"
+        )
+
+except Exception as e:
+
+    st.error(
+        f"Erreur chargement portefeuille : {e}"
+    )
+
+    st.stop()
+
+# -----------------------------
+# Courbe des taux
+# -----------------------------
+
+fichier_courbe = st.sidebar.file_uploader(
+    "📈 Charger la courbe des taux",
+    type=["csv", "xlsx"]
 )
-28
-fig.update_layout(
-29
-xaxis_title="Maturité",
-30
-yaxis_title="Taux"
-31
-)
-33
-st.plotly_chart(
-34
-fig,
-35
-use_container_width=True
-36
-)
+
+try:
+
+    if fichier_courbe is not None:
+
+        if fichier_courbe.name.endswith(".csv"):
+
+            courbe = pd.read_csv(
+                fichier_courbe
+            )
+
+        else:
+
+            courbe = pd.read_excel(
+                fichier_courbe,
+                engine="openpyxl"
+            )
+
+        st.sidebar.success(
+            "Courbe chargée"
+        )
+
+    else:
+
+        courbe = pd.read_csv(
+            "courbe_taux.csv"
+        )
+
+except Exception as e:
+
+    st.error(
+        f"Erreur chargement courbe : {e}"
+    )
+
+    st.stop()
 
 # ==================================================
 # PREPARATION
@@ -200,6 +109,20 @@ portefeuille.columns = [
     str(col).strip()
     for col in portefeuille.columns
 ]
+
+courbe.columns = [
+    str(col).strip()
+    for col in courbe.columns
+]
+
+if "Taux" in courbe.columns:
+
+    courbe.rename(
+        columns={
+            "Taux": "rate"
+        },
+        inplace=True
+    )
 
 # ==================================================
 # KPI
@@ -271,7 +194,7 @@ with col4:
     )
 
 # ==================================================
-# TABLEAU PORTEFEUILLE
+# PORTEFEUILLE
 # ==================================================
 
 st.subheader("📁 Portefeuille")
@@ -294,9 +217,7 @@ colonnes_existantes = [
 ]
 
 st.dataframe(
-    portefeuille[
-        colonnes_existantes
-    ],
+    portefeuille[colonnes_existantes],
     use_container_width=True
 )
 
