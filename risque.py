@@ -1,34 +1,23 @@
-def macaulay_duration(bond, curve):
+def macaulay_duration(
+    bond,
+    curve
+):
 
     price = bond.price(curve)
 
     weighted_pv = 0
 
-    n = int(
-        bond.maturity
-        * bond.frequency
-    )
-
-    coupon = (
-        bond.nominal
-        * bond.coupon_rate
-        / bond.frequency
-    )
-
-    for i in range(1, n + 1):
-
-        t = i / bond.frequency
+    for t, cf in bond.cashflows():
 
         rate = curve.get_rate(t)
 
-        cashflow = coupon
+        pv = cf / (
+            (1 + rate) ** t
+        )
 
-        if i == n:
-            cashflow += bond.nominal
-
-        pv = cashflow / ((1 + rate) ** t)
-
-        weighted_pv += t * pv
+        weighted_pv += (
+            t * pv
+        )
 
     return weighted_pv / price
 
@@ -48,7 +37,8 @@ def modified_duration(
     )
 
     return md / (
-        1 + y / bond.frequency
+        1 + y /
+        bond.frequency
     )
 
 
@@ -61,32 +51,14 @@ def convexity(
 
     total = 0
 
-    n = int(
-        bond.maturity
-        * bond.frequency
-    )
-
-    coupon = (
-        bond.nominal
-        * bond.coupon_rate
-        / bond.frequency
-    )
-
-    for i in range(1, n + 1):
-
-        t = i / bond.frequency
+    for t, cf in bond.cashflows():
 
         rate = curve.get_rate(t)
 
-        cashflow = coupon
-
-        if i == n:
-            cashflow += bond.nominal
-
         total += (
-            cashflow
-            * t
-            * (t + 1)
+            cf *
+            t *
+            (t + 1)
             /
             ((1 + rate) ** (t + 2))
         )
@@ -101,13 +73,13 @@ def dv01(
 
     price = bond.price(curve)
 
-    mod_dur = modified_duration(
+    mod_duration = modified_duration(
         bond,
         curve
     )
 
     return (
-        price
-        * mod_dur
-        * 0.0001
+        price *
+        mod_duration *
+        0.0001
     )
